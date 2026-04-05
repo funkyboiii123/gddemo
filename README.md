@@ -6,7 +6,7 @@ this is a [(mostly)](https://github.com/sogful/gddemo/tree/main/src/game/Depende
 - clone the repository:
    ```
    git clone https://github.com/sogful/gddemo.git
-   cd geometry-dash-web
+   cd gddemo
    ```
 - install dependencies:
    ```
