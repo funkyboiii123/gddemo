@@ -103,8 +103,8 @@ class GameScene extends Phaser.Scene {
     }).setOrigin(1, 1).setScrollFactor(0).setDepth(30).setAlpha(0.3);
     this._tryMeImg = this.add.image(0, 182.5, "GJ_WebSheet", "tryMe_001.png").setScrollFactor(0).setDepth(30);
     this._downloadBtns = [];
-    for (let i = 0; i < GD_MENU_STORE_DOWNLOADS.length; i++) {
-      const store = GD_MENU_STORE_DOWNLOADS[i];
+    for (let i = 0; i < MenuLinks.length; i++) {
+      const store = MenuLinks[i];
       const btnScale = 1 / 1.5;
       const img = this.add.image(0, 0, "GJ_WebSheet", store.key + ".png").setScrollFactor(0).setDepth(30).setScale(btnScale).setInteractive();
       this._makeBouncyButton(img, btnScale, () => window.open(store.url, "_blank"), () => this._menuActive);
@@ -221,29 +221,29 @@ class GameScene extends Phaser.Scene {
     window.addEventListener("resize", () => {
       this.scale.refresh();
     });
-    if (this.game.registry.get(GD_REGISTRY.PAUSE_RETURN_FADE_IN)) {
-      this.game.registry.remove(GD_REGISTRY.PAUSE_RETURN_FADE_IN);
-      this.cameras.main.fadeIn(GD_SCENE_FADE_MS.PAUSE_MENU_IN, 0, 0, 0);
-    } else if (this.game.registry.get(GD_REGISTRY.FADE_IN_FROM_BLACK)) {
-      this.game.registry.remove(GD_REGISTRY.FADE_IN_FROM_BLACK);
-      this.cameras.main.fadeIn(GD_SCENE_FADE_MS.END_MENU_IN, 0, 0, 0);
+    if (this.game.registry.get(GDRegistry.PauseReturnFadeIn)) {
+      this.game.registry.remove(GDRegistry.PauseReturnFadeIn);
+      this.cameras.main.fadeIn(SceneFadeMs.PauseMenuIn, 0, 0, 0);
+    } else if (this.game.registry.get(GDRegistry.FadeInFromBlack)) {
+      this.game.registry.remove(GDRegistry.FadeInFromBlack);
+      this.cameras.main.fadeIn(SceneFadeMs.EndMenuIn, 0, 0, 0);
     }
   }
   _pauseRowButtonAction(kind) {
     switch (kind) {
-      case GD_PAUSE_KIND.REPLAY:
+      case PauseKind.REPLAY:
         return () => {
           this._resumeGame();
           this._restartLevel();
         };
-      case GD_PAUSE_KIND.RESUME:
+      case PauseKind.RESUME:
         return () => this._resumeGame();
-      case GD_PAUSE_KIND.MENU:
+      case PauseKind.MENU:
         return () => {
           this._audio.playEffect("quitSound_01");
           this._audio.stopMusic();
-          this.game.registry.set(GD_REGISTRY.PAUSE_RETURN_FADE_IN, true);
-          this.cameras.main.fadeOut(GD_SCENE_FADE_MS.PAUSE_MENU_OUT, 0, 0, 0, (_cam, progress) => {
+          this.game.registry.set(GDRegistry.PauseReturnFadeIn, true);
+          this.cameras.main.fadeOut(SceneFadeMs.PauseMenuOut, 0, 0, 0, (_cam, progress) => {
             if (progress >= 1) {
               this.scene.restart();
             }
@@ -255,14 +255,14 @@ class GameScene extends Phaser.Scene {
   }
   _endScreenButtonAction(kind) {
     switch (kind) {
-      case GD_END_KIND.REPLAY:
+      case EndKind.REPLAY:
         return () => this._hideEndLayer(() => this._restartLevel());
-      case GD_END_KIND.MENU:
+      case EndKind.MENU:
         return () => {
           this._audio.playEffect("quitSound_01");
           this._audio.stopMusic();
-          this.game.registry.set(GD_REGISTRY.FADE_IN_FROM_BLACK, true);
-          this.cameras.main.fadeOut(GD_SCENE_FADE_MS.END_MENU_OUT, 0, 0, 0, (_camera, progress) => {
+          this.game.registry.set(GDRegistry.FadeInFromBlack, true);
+          this.cameras.main.fadeOut(SceneFadeMs.EndMenuOut, 0, 0, 0, (_camera, progress) => {
             if (progress >= 1) {
               this.scene.restart();
             }
@@ -371,13 +371,13 @@ class GameScene extends Phaser.Scene {
     this._pauseContainer.add(progressBarFill);
     this._pauseContainer.add(this.add.bitmapText(screenCenterX, progressRowY, "bigFont", bestPct + "%", 30).setOrigin(0.5, 0.5).setScale(0.7));
     this._pauseContainer.add(this.add.bitmapText(screenCenterX, 130, "bigFont", "Normal Mode", 30).setOrigin(0.5, 0.5).setScale(0.78));
-    const pauseBtnWidths = GD_PAUSE_ROW_BUTTONS.map(btn => {
+    const pauseBtnWidths = PauseButtons.map(btn => {
       const fr = this.textures.getFrame("GJ_WebSheet", btn.frame);
       return fr ? fr.width : 246;
     });
-    let rowLeft = screenCenterX - (pauseBtnWidths.reduce((sum, w) => sum + w, 0) + (GD_PAUSE_ROW_BUTTONS.length - 1) * 40) / 2;
-    for (let i = 0; i < GD_PAUSE_ROW_BUTTONS.length; i++) {
-      const spec = GD_PAUSE_ROW_BUTTONS[i];
+    let rowLeft = screenCenterX - (pauseBtnWidths.reduce((sum, w) => sum + w, 0) + (PauseButtons.length - 1) * 40) / 2;
+    for (let i = 0; i < PauseButtons.length; i++) {
+      const spec = PauseButtons[i];
       const w = pauseBtnWidths[i];
       const img = this.add.image(rowLeft + w / 2, 330, "GJ_WebSheet", spec.frame).setInteractive();
       this._pauseContainer.add(img);
@@ -456,7 +456,7 @@ class GameScene extends Phaser.Scene {
     this._infoPopup.add(ytBtn);
     this._expandHitArea(ytBtn, 2);
     this._makeBouncyButton(ytBtn, 0.5, () => {
-      window.open(GD_INFO_CREDITS_YOUTUBE_URL, "_blank");
+      window.open(CreditsLink, "_blank");
     });
     const legal1 = this.add.text(centerX, 446, "© 2026 RobTop Games. All rights reserved.", {
       fontSize: "12px",
@@ -1530,8 +1530,8 @@ class GameScene extends Phaser.Scene {
     const praiseOffsetX = 225;
     this._endLayerInternal.add(this.add.bitmapText(cx + praiseOffsetX, statsRowForPraiseY, "bigFont", praise, 40).setOrigin(0.5, 0.5).setScale(0.8).setCenterAlign());
     this._endLayerInternal.add(this.add.image(cx - praiseOffsetX, 352.5, "GJ_WebSheet", "getIt_001.png").setScale(1 / 1.5));
-    for (let d = 0; d < GD_END_SCREEN_DOWNLOADS.length; d++) {
-      const row = GD_END_SCREEN_DOWNLOADS[d];
+    for (let d = 0; d < EndScreenLinks.length; d++) {
+      const row = EndScreenLinks[d];
       const dx = (d - 1) * praiseOffsetX;
       const dlScale = 1 / 1.5;
       const dlImg = this.add.image(cx + dx, 437.5, "GJ_WebSheet", row.key + ".png").setScale(dlScale).setInteractive();
@@ -1540,7 +1540,7 @@ class GameScene extends Phaser.Scene {
     }
     this._endStarX = cx + praiseOffsetX;
     this._endStarY = statsRowForPraiseY - 77.5;
-    for (const spec of GD_END_SCREEN_ACTION_BUTTONS) {
+    for (const spec of EndScreenButtons) {
       const btn = this.add.image(cx + spec.dx, 555, "GJ_WebSheet", spec.frame).setInteractive();
       this._endLayerInternal.add(btn);
       this._makeBouncyButton(btn, 1, this._endScreenButtonAction(spec.kind));

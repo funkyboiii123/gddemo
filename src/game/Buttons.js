@@ -1,26 +1,26 @@
-const GD_PAUSE_KIND = {
+const PauseKind = {
   REPLAY: "pauseReplay",
   RESUME: "pauseResume",
   MENU: "pauseMenu"
 };
-const GD_END_KIND = {
+const EndKind = {
   REPLAY: "endReplay",
   MENU: "endMenu"
 };
-const GD_REGISTRY = {
-  PAUSE_RETURN_FADE_IN: "pauseReturnFadeIn",
-  FADE_IN_FROM_BLACK: "fadeInFromBlack"
+const GDRegistry = {
+  PauseReturnFadeIn: "pauseReturnFadeIn",
+  FadeInFromBlack: "fadeInFromBlack"
 };
-const GD_SCENE_FADE_MS = {
-  PAUSE_MENU_OUT: 250,
-  PAUSE_MENU_IN: 250,
-  END_MENU_OUT: 400,
-  END_MENU_IN: 400
+const SceneFadeMs = {
+  PauseMenuOut: 250,
+  PauseMenuIn: 250,
+  EndMenuOut: 400,
+  EndMenuIn: 400
 };
 
-const GD_INFO_CREDITS_YOUTUBE_URL = "https://www.youtube.com/watch?v=JhKyKEDxo8Q";
+const CreditsLink = "https://www.youtube.com/watch?v=JhKyKEDxo8Q";
 
-const GD_MENU_STORE_DOWNLOADS = [{
+const MenuLinks = [{
   key: "downloadSteam_001",
   url: "https://store.steampowered.com/app/322170/Geometry_Dash"
 }, {
@@ -31,7 +31,7 @@ const GD_MENU_STORE_DOWNLOADS = [{
   url: "https://apps.apple.com/us/app/geometry-dash/id625334537"
 }];
 
-const GD_END_SCREEN_DOWNLOADS = [{
+const EndScreenLinks = [{
   key: "downloadApple_001",
   url: "https://apps.apple.com/us/app/geometry-dash/id625334537"
 }, {
@@ -42,23 +42,23 @@ const GD_END_SCREEN_DOWNLOADS = [{
   url: "https://store.steampowered.com/app/322170/Geometry_Dash"
 }];
 
-const GD_PAUSE_ROW_BUTTONS = [{
+const PauseButtons = [{
   frame: "GJ_replayBtn_001.png",
-  kind: GD_PAUSE_KIND.REPLAY
+  kind: PauseKind.REPLAY
 }, {
   frame: "GJ_playBtn2_001.png",
-  kind: GD_PAUSE_KIND.RESUME
+  kind: PauseKind.RESUME
 }, {
   frame: "GJ_menuBtn_001.png",
-  kind: GD_PAUSE_KIND.MENU
+  kind: PauseKind.MENU
 }];
 
-const GD_END_SCREEN_ACTION_BUTTONS = [{
+const EndScreenButtons = [{
   frame: "GJ_replayBtn_001.png",
   dx: -200,
-  kind: GD_END_KIND.REPLAY
+  kind: EndKind.REPLAY
 }, {
   frame: "GJ_menuBtn_001.png",
   dx: 200,
-  kind: GD_END_KIND.MENU
+  kind: EndKind.MENU
 }];
