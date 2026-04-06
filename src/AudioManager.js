@@ -1,9 +1,9 @@
 // audio, so music and sfx. getMeteringValue() feeds rod/orb pulse scaling
 class AudioManager {
-  constructor(p14315) {
-    this._scene = p14315;
+  constructor(scene) {
+    this._scene = scene;
     this._music = null;
-    this._userMusicVol = p14315.game.registry.get("userMusicVol") ?? 1;
+    this._userMusicVol = scene.game.registry.get("userMusicVol") ?? 1;
     this._meteringEnabled = false;
     this._analyser = null;
     this._meterBuffer = null;
@@ -45,9 +45,9 @@ class AudioManager {
   getUserMusicVolume() {
     return this._userMusicVol;
   }
-  setUserMusicVolume(p14316) {
-    this._userMusicVol = p14316;
-    this._scene.game.registry.set("userMusicVol", p14316);
+  setUserMusicVolume(volume) {
+    this._userMusicVol = volume;
+    this._scene.game.registry.set("userMusicVol", volume);
     if (this._music) {
       this._music.volume = this._effectiveVolume();
     }
@@ -55,10 +55,10 @@ class AudioManager {
   getMusicVolume() {
     return this._effectiveVolume();
   }
-  setMusicVolume(p14317) {
-    this.setUserMusicVolume(p14317 / 0.8);
+  setMusicVolume(volume) {
+    this.setUserMusicVolume(volume / 0.8);
   }
-  fadeInMusic(p14318 = 1000) {
+  fadeInMusic(durationMs = 1000) {
     if (this._music) {
       this._music.stop();
       this._music.destroy();
@@ -72,16 +72,16 @@ class AudioManager {
     this._scene.tweens.add({
       targets: this._music,
       volume: this._effectiveVolume(),
-      duration: p14318
+      duration: durationMs
     });
   }
-  fadeOutMusic(p14319 = 1500) {
+  fadeOutMusic(durationMs = 1500) {
     if (this._music && this._music.isPlaying) {
       this._music.setLoop(false);
       this._scene.tweens.add({
         targets: this._music,
         volume: 0,
-        duration: p14319,
+        duration: durationMs,
         onComplete: () => {
           if (this._music) {
             this._music.stop();
@@ -90,10 +90,10 @@ class AudioManager {
       });
     }
   }
-  playEffect(p14320, p14321 = {}) {
+  playEffect(soundKey, config = {}) {
     const sfxSceneMul = this._scene._sfxVolume !== undefined ? this._scene._sfxVolume : 1;
-    p14321.volume = (p14321.volume || 1) * sfxSceneMul;
-    this._scene.sound.play(p14320, p14321);
+    config.volume = (config.volume || 1) * sfxSceneMul;
+    this._scene.sound.play(soundKey, config);
   }
   _setupAnalyser() {
     const audioCtx = this._scene.sound.context;
@@ -105,7 +105,7 @@ class AudioManager {
       this._meteringEnabled = true;
     }
   }
-  update(p14322) {
+  update(deltaSeconds) {
     if (!this._meteringEnabled || !this._analyser) {
       return;
     }
@@ -122,7 +122,7 @@ class AudioManager {
       peakAbs /= musicVolNorm;
     }
     this._meterValue = 0.1 + peakAbs;
-    const dtScaled = p14322 * 60;
+    const dtScaled = deltaSeconds * 60;
     if (this._silenceCounter < 3 || this._meterValue < this._lastAudio * 1.1 || this._meterValue < this._lastPeak * 0.95 && this._lastAudio > this._lastPeak * 0.2) {
       this._meterValue = this._lastAudio * Math.pow(0.92, dtScaled);
     } else {

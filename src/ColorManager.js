@@ -18,21 +18,21 @@ class ColorManager {
     };
     this._actions = {};
   }
-  triggerColor(p14309, p14310, p14311) {
+  triggerColor(colorId, targetColor, duration) {
     let fromRgb = {
-      ...this.getColor(p14309)
+      ...this.getColor(colorId)
     };
-    this._actions[p14309] = new RgbColorTween(fromRgb, p14310, p14311);
-    if (p14311 <= 0) {
-      this._colors[p14309] = {
-        ...p14310
+    this._actions[colorId] = new RgbColorTween(fromRgb, targetColor, duration);
+    if (duration <= 0) {
+      this._colors[colorId] = {
+        ...targetColor
       };
     }
   }
-  step(p14312) {
+  step(deltaSeconds) {
     for (let colorId in this._actions) {
       let tween = this._actions[colorId];
-      tween.step(p14312);
+      tween.step(deltaSeconds);
       this._colors[colorId] = {
         ...tween.current
       };
@@ -41,15 +41,15 @@ class ColorManager {
       }
     }
   }
-  getColor(p14313) {
-    return this._colors[p14313] || {
+  getColor(colorId) {
+    return this._colors[colorId] || {
       r: 255,
       g: 255,
       b: 255
     };
   }
-  getHex(p14314) {
-    let rgb = this.getColor(p14314);
+  getHex(colorId) {
+    let rgb = this.getColor(colorId);
     return rgb.r << 16 | rgb.g << 8 | rgb.b;
   }
 }

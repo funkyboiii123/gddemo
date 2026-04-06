@@ -1,18 +1,18 @@
 const s = t(e ? i.exports : (e = 1, i.exports = (() => {
-  var vO2 = globalThis.__GD_MODULE_MAP;
-  var vO197 = {};
-  function f161(p13979) {
-    var cached = vO197[p13979];
+  var moduleFactories = globalThis.__GD_MODULE_MAP;
+  var moduleCache = {};
+  function requireModule(moduleId) {
+    var cached = moduleCache[moduleId];
     if (cached !== undefined) {
       return cached.exports;
     }
-    var moduleRecord = vO197[p13979] = {
+    var moduleRecord = moduleCache[moduleId] = {
       exports: {}
     };
-    vO2[p13979](moduleRecord, moduleRecord.exports, f161);
+    moduleFactories[moduleId](moduleRecord, moduleRecord.exports, requireModule);
     return moduleRecord.exports;
   }
-  f161.g = function () {
+  requireModule.g = function () {
     if (typeof globalThis == "object") {
       return globalThis;
     }
@@ -24,5 +24,5 @@ const s = t(e ? i.exports : (e = 1, i.exports = (() => {
       }
     }
   }();
-  return f161(85454);
+  return requireModule(85454);
 })()));

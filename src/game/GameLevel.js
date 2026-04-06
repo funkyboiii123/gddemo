@@ -158,7 +158,7 @@ class GameLevel {
     this._ceilingShadowR.x = gameWidth + 1;
   }
   // scroll/recycle ground tiles with the camera, when in ship gamemode animates floor/ceiling towards the so called ship "corridor" (idk how that would be called)
-  updateGroundTiles(p14196 = 0) {
+  updateGroundTiles(groundYOffset = 0) {
     const camX = this._cameraXRef.value;
     const tileW = this._tileW;
     let groundScreenY;
@@ -170,12 +170,12 @@ class GameLevel {
       const flyCeilingVisualY = 20;
       groundScreenY = this._groundStartScreenY + (flyFloorVisualY - this._groundStartScreenY) * groundBlendT;
       ceilingScreenY = this._ceilingStartScreenY + (flyCeilingVisualY - this._ceilingStartScreenY) * groundBlendT;
-      let maxGroundY = gameYToWorldY(0) + p14196;
+        let maxGroundY = gameYToWorldY(0) + groundYOffset;
       if (groundScreenY > maxGroundY) {
         groundScreenY = maxGroundY;
       }
     } else {
-      groundScreenY = gameYToWorldY(0) + p14196;
+      groundScreenY = gameYToWorldY(0) + groundYOffset;
       ceilingScreenY = 0;
     }
     for (let gi = 0; gi < this._groundTiles.length; gi++) {
@@ -209,20 +209,20 @@ class GameLevel {
     this._ceilingShadowL.setVisible(showCeilingDecor);
     this._ceilingShadowR.setVisible(showCeilingDecor);
   }
-  shiftGroundTiles(p14197) {
+  shiftGroundTiles(worldShiftX) {
     for (let si = 0; si < this._groundTiles.length; si++) {
-      this._groundTiles[si]._worldX += p14197;
-      this._ceilingTiles[si]._worldX += p14197;
+      this._groundTiles[si]._worldX += worldShiftX;
+      this._ceilingTiles[si]._worldX += worldShiftX;
     }
-    this._maxGroundWorldX += p14197;
+    this._maxGroundWorldX += worldShiftX;
   }
-  resetGroundTiles(p14198) {
+  resetGroundTiles(startWorldX) {
     const tw = this._tileW;
     for (let ri = 0; ri < this._groundTiles.length; ri++) {
-      this._groundTiles[ri]._worldX = p14198 + ri * tw;
-      this._ceilingTiles[ri]._worldX = p14198 + ri * tw;
+      this._groundTiles[ri]._worldX = startWorldX + ri * tw;
+      this._ceilingTiles[ri]._worldX = startWorldX + ri * tw;
     }
-    this._maxGroundWorldX = p14198 + (this._groundTiles.length - 1) * tw;
+    this._maxGroundWorldX = startWorldX + (this._groundTiles.length - 1) * tw;
     this.resetGroundState();
   }
   resetGroundState() {
@@ -233,8 +233,8 @@ class GameLevel {
     this._ceilingY = null;
     this.flyCameraTarget = null;
   }
-  _computeFlyBounds(p14199) {
-    let floorSnap = p14199 - 300;
+  _computeFlyBounds(anchorGameY) {
+    let floorSnap = anchorGameY - 300;
     floorSnap = Math.floor(floorSnap / gridCellPx) * gridCellPx;
     floorSnap = Math.max(0, floorSnap);
     return {
@@ -242,9 +242,9 @@ class GameLevel {
       ceilingY: floorSnap + ceilingExtraPx
     };
   }
-  setFlyMode(p14200, p14201) {
-    if (p14200) {
-      let bounds = this._computeFlyBounds(p14201);
+  setFlyMode(enableFlyMode, playerGameY) {
+    if (enableFlyMode) {
+      let bounds = this._computeFlyBounds(playerGameY);
       this._flyFloorY = bounds.floorY;
       this._flyCeilingY = bounds.ceilingY;
       this._flyGroundActive = true;
@@ -270,11 +270,11 @@ class GameLevel {
       this._groundAnimating = true;
     }
   }
-  stepGroundAnimation(p14202) {
+  stepGroundAnimation(deltaSeconds) {
     if (!this._groundAnimating) {
       return;
     }
-    this._groundAnimTime += p14202;
+    this._groundAnimTime += deltaSeconds;
     let animT = this._groundAnimDuration > 0 ? Math.min(this._groundAnimTime / this._groundAnimDuration, 1) : 1;
     this._groundTargetValue = this._groundAnimFrom + (this._groundAnimTo - this._groundAnimFrom) * animT;
     if (animT >= 1) {
@@ -299,22 +299,22 @@ class GameLevel {
       return null;
     }
   }
-  _applyVisualProps(p14203, p14204, p14205, p14206, p14207 = null) {
-    if (!p14204) {
+  _applyVisualProps(scene, sprite, frameName, levelObj, layerProps = null) {
+    if (!sprite) {
       return;
     }
-    let {
-      dx: _0x4aea8a,
-      dy: _0x545b71
-    } = function (p14208, p14209) {
-      let vR2 = resolveAtlasFrame(p14208, p14209);
+    const {
+      dx: frameOffsetX,
+      dy: frameOffsetY
+    } = function (sceneRef, frameRef) {
+      let vR2 = resolveAtlasFrame(sceneRef, frameRef);
       if (!vR2) {
         return {
           dx: 0,
           dy: 0
         };
       }
-      let phaserFrame = p14208.textures.get(vR2.atlas).get(vR2.frame);
+      let phaserFrame = sceneRef.textures.get(vR2.atlas).get(vR2.frame);
       if (!phaserFrame) {
         return {
           dx: 0,
@@ -342,74 +342,74 @@ class GameLevel {
         dx: realW / 2 - (srcX + trimW / 2),
         dy: realH / 2 - (srcY + trimH / 2)
       };
-    }(p14203, p14205);
-    if (p14206.flipX) {
-      p14204.setFlipX(true);
+    }(scene, frameName);
+    if (levelObj.flipX) {
+      sprite.setFlipX(true);
     }
-    if (p14206.flipY) {
-      p14204.setFlipY(true);
+    if (levelObj.flipY) {
+      sprite.setFlipY(true);
     }
-    let totalRotationDeg = (p14204.getData("gjBaseRotationDeg") || 0) + p14206.rot;
+    let totalRotationDeg = (sprite.getData("gjBaseRotationDeg") || 0) + levelObj.rot;
     if (totalRotationDeg !== 0) {
-      p14204.setAngle(totalRotationDeg);
+      sprite.setAngle(totalRotationDeg);
     }
-    if (p14206.scale !== 1) {
-      p14204.setScale(p14206.scale);
+    if (levelObj.scale !== 1) {
+      sprite.setScale(levelObj.scale);
     }
-    if (p14207) {
-      if (p14207.tint !== undefined) {
-        p14204.setTint(p14207.tint);
-      } else if (p14207.black) {
-        p14204.setTint(0);
+    if (layerProps) {
+      if (layerProps.tint !== undefined) {
+        sprite.setTint(layerProps.tint);
+      } else if (layerProps.black) {
+        sprite.setTint(0);
       }
     }
   }
-  _addVisualSprite(p14210, p14211 = null) {
-    if (p14210) {
-      if (p14211 && p14211.blend === "additive") {
-        p14210.setBlendMode(blendAdditive);
-        p14210._eeLayer = 0;
-      } else if (p14211 && p14211._portalFront) {
-        p14210._eeLayer = 2;
-      } else if (p14211 && p14211.z !== undefined && p14211.z < 0) {
-        p14210._eeLayer = 0;
+  _addVisualSprite(sprite, layerProps = null) {
+    if (sprite) {
+      if (layerProps && layerProps.blend === "additive") {
+        sprite.setBlendMode(blendAdditive);
+        sprite._eeLayer = 0;
+      } else if (layerProps && layerProps._portalFront) {
+        sprite._eeLayer = 2;
+      } else if (layerProps && layerProps.z !== undefined && layerProps.z < 0) {
+        sprite._eeLayer = 0;
       } else {
-        p14210._eeLayer = 1;
+        sprite._eeLayer = 1;
       }
     }
   }
-  _getGlowFrameName(p14212) {
-    if (p14212 && p14212.endsWith("_001.png")) {
-      return p14212.replace("_001.png", "_glow_001.png");
+  _getGlowFrameName(frameName) {
+    if (frameName && frameName.endsWith("_001.png")) {
+      return frameName.replace("_001.png", "_glow_001.png");
     } else {
       return null;
     }
   }
-  _addGlowSprite(p14213, p14214, p14215, p14216, p14217, p14218) {
-    let glowFrameName = this._getGlowFrameName(p14216);
+  _addGlowSprite(scene, worldX, worldY, frameName, levelObj, sectionWorldX) {
+    let glowFrameName = this._getGlowFrameName(frameName);
     if (!glowFrameName) {
       return;
     }
-    if (!resolveAtlasFrame(p14213, glowFrameName) && !p14213.textures.exists(glowFrameName)) {
+    if (!resolveAtlasFrame(scene, glowFrameName) && !scene.textures.exists(glowFrameName)) {
       return;
     }
-    let glowSprite = addAtlasOrStandaloneImage(p14213, p14214, p14215, glowFrameName);
+    let glowSprite = addAtlasOrStandaloneImage(scene, worldX, worldY, glowFrameName);
     if (glowSprite) {
-      this._applyVisualProps(p14213, glowSprite, glowFrameName, p14217);
+      this._applyVisualProps(scene, glowSprite, glowFrameName, levelObj);
       glowSprite.setBlendMode(blendAdditive);
       glowSprite._eeLayer = 0;
-      if (p14218 !== undefined) {
-        glowSprite._eeWorldX = p14218;
-        glowSprite._eeBaseY = p14215;
+      if (sectionWorldX !== undefined) {
+        glowSprite._eeWorldX = sectionWorldX;
+        glowSprite._eeBaseY = worldY;
         this._addToSection(glowSprite);
       }
     }
   }
   // builds visuals + collision from parsed level objects (see gjObjectById for id to sprite/portal data)
-  _spawnLevelObjects(p14219) {
+  _spawnLevelObjects(levelObjects) {
     const scene = this._scene;
     this._lastObjectX = 0;
-    for (let obj of p14219) {
+    for (let obj of levelObjects) {
       let def = getGjObjectById(obj.id);
       if (def && def.type === objectTypeTrigger) {
         // color triggers 29/30 - COLOR_ID_BACKGROUND / COLOR_ID_GROUND (GameScene applies via ColorManager)
@@ -622,7 +622,7 @@ class GameLevel {
     this._enterEffectTriggers.sort((a, b) => a.x - b.x);
     this.endXPos = Math.max(gameWidth + 1200, this._lastObjectX + 680);
   }
-  createEndPortal(p14226) {
+  createEndPortal(scene) {
     var gradientFrameRef;
     if (this.endXPos <= 0) {
       return;
@@ -630,14 +630,14 @@ class GameLevel {
     const endX = this.endXPos;
     const portalWorldY = gameYToWorldY(240);
     const pillarCount = Math.round(16);
-    this._endPortalContainer = p14226.add.container(endX, portalWorldY);
+    this._endPortalContainer = scene.add.container(endX, portalWorldY);
     for (let pi = 0; pi < pillarCount; pi++) {
-      const pillar = p14226.add.image(0, (pi - Math.floor(pillarCount / 2)) * gridCellPx, "GJ_WebSheet", "square_02_001.png").setAngle(-90);
+      const pillar = scene.add.image(0, (pi - Math.floor(pillarCount / 2)) * gridCellPx, "GJ_WebSheet", "square_02_001.png").setAngle(-90);
       this._endPortalContainer.add(pillar);
     }
     this.container.add(this._endPortalContainer);
-    this._endPortalShine = p14226.add.image(endX - 58, portalWorldY, "GJ_WebSheet", "gradientBar.png");
-    const gradientH = ((gradientFrameRef = p14226.textures.getFrame("GJ_WebSheet", "gradientBar.png")) == null ? undefined : gradientFrameRef.height) || 64;
+    this._endPortalShine = scene.add.image(endX - 58, portalWorldY, "GJ_WebSheet", "gradientBar.png");
+    const gradientH = ((gradientFrameRef = scene.textures.getFrame("GJ_WebSheet", "gradientBar.png")) == null ? undefined : gradientFrameRef.height) || 64;
     this._endPortalShine.setBlendMode(blendAdditive);
     this._endPortalShine.setTint(tintLimeGreen);
     this._endPortalShine.setScale(1, 960 / gradientH);
@@ -652,7 +652,7 @@ class GameLevel {
         return pt;
       }
     };
-    this._endPortalEmitter = p14226.add.particles(endEmitterX, portalWorldY, "GJ_WebSheet", {
+    this._endPortalEmitter = scene.add.particles(endEmitterX, portalWorldY, "GJ_WebSheet", {
       frame: "square.png",
       lifespan: {
         min: 200,
@@ -689,23 +689,23 @@ class GameLevel {
     this.topContainer.add(this._endPortalEmitter);
     this._endPortalGameY = 240;
   }
-  updateEndPortalY(p14229, p14230) {
+  updateEndPortalY(cameraYOffset, allowLowerThanDefault) {
     if (!this._endPortalContainer) {
       return;
     }
-    const baseGameY = 140 + p14229;
-    const resolvedGameY = p14230 ? baseGameY : Math.max(240, baseGameY);
+    const baseGameY = 140 + cameraYOffset;
+    const resolvedGameY = allowLowerThanDefault ? baseGameY : Math.max(240, baseGameY);
     const portalY = gameYToWorldY(resolvedGameY);
     this._endPortalContainer.y = portalY;
     this._endPortalShine.y = portalY;
     this._endPortalEmitter.y = portalY;
     this._endPortalGameY = resolvedGameY;
   }
-  checkColorTriggers(p14231) {
+  checkColorTriggers(playerWorldX) {
     let fired = [];
     while (this._colorTriggerIdx < this._colorTriggers.length) {
       let trig = this._colorTriggers[this._colorTriggerIdx];
-      if (!(trig.x <= p14231)) {
+      if (!(trig.x <= playerWorldX)) {
         break;
       }
       fired.push(trig);
@@ -716,13 +716,13 @@ class GameLevel {
   resetColorTriggers() {
     this._colorTriggerIdx = 0;
   }
-  _addToSection(p14232) {
-    const secIdx = Math.max(0, Math.floor(p14232._eeWorldX / 400));
+  _addToSection(sprite) {
+    const secIdx = Math.max(0, Math.floor(sprite._eeWorldX / 400));
     this._sections[secIdx] ||= [];
-    this._sections[secIdx].push(p14232);
-    const layer = p14232._eeLayer !== undefined ? p14232._eeLayer : 1;
+    this._sections[secIdx].push(sprite);
+    const layer = sprite._eeLayer !== undefined ? sprite._eeLayer : 1;
     if (layer === 2) {
-      this.topContainer.add(p14232);
+      this.topContainer.add(sprite);
       return;
     }
     if (!this._sectionContainers[secIdx]) {
@@ -736,32 +736,32 @@ class GameLevel {
     }
     const containers = this._sectionContainers[secIdx];
     if (layer === 0) {
-      containers.additive.add(p14232);
-    } else if (p14232._eeBehindParent) {
-      containers.normal.addAt(p14232, 0);
+      containers.additive.add(sprite);
+    } else if (sprite._eeBehindParent) {
+      containers.normal.addAt(sprite, 0);
     } else {
-      containers.normal.add(p14232);
+      containers.normal.add(sprite);
     }
   }
-  _addCollisionToSection(p14233) {
-    const colSec = Math.max(0, Math.floor(p14233.x / 400));
+  _addCollisionToSection(collisionRect) {
+    const colSec = Math.max(0, Math.floor(collisionRect.x / 400));
     this._collisionSections[colSec] ||= [];
-    this._collisionSections[colSec].push(p14233);
+    this._collisionSections[colSec].push(collisionRect);
   }
-  _setSectionVisible(p14234, p14235) {
-    const sec = this._sectionContainers[p14234];
+  _setSectionVisible(sectionIndex, visible) {
+    const sec = this._sectionContainers[sectionIndex];
     if (sec) {
-      sec.additive.visible = p14235;
-      sec.normal.visible = p14235;
+      sec.additive.visible = visible;
+      sec.normal.visible = visible;
     }
   }
-  updateVisibility(p14236) {
+  updateVisibility(cameraX) {
     const maxSec = this._sectionContainers.length - 1;
     if (maxSec < 0) {
       return;
     }
-    const visMin = Math.max(0, Math.floor((p14236 - 140) / 400));
-    const visMax = Math.min(maxSec, Math.floor((p14236 + gameWidth + 140) / 400));
+    const visMin = Math.max(0, Math.floor((cameraX - 140) / 400));
+    const visMax = Math.min(maxSec, Math.floor((cameraX + gameWidth + 140) / 400));
     const prevMin = this._visMinSec;
     const prevMax = this._visMaxSec;
     if (prevMin < 0) {
@@ -797,8 +797,8 @@ class GameLevel {
       this._visMaxSec = visMax;
     }
   }
-  getNearbySectionObjects(p14237) {
-    const centerSec = Math.max(0, Math.floor(p14237 / 400));
+  getNearbySectionObjects(worldX) {
+    const centerSec = Math.max(0, Math.floor(worldX / 400));
     const fromSec = Math.max(0, centerSec - 1);
     const toSec = Math.min(this._collisionSections.length - 1, centerSec + 1);
     const buf = this._nearbyBuffer;
@@ -813,10 +813,10 @@ class GameLevel {
     }
     return buf;
   }
-  checkEnterEffectTriggers(p14238) {
+  checkEnterEffectTriggers(playerWorldX) {
     while (this._enterEffectTriggerIdx < this._enterEffectTriggers.length) {
       let row = this._enterEffectTriggers[this._enterEffectTriggerIdx];
-      if (!(row.x <= p14238)) {
+      if (!(row.x <= playerWorldX)) {
         break;
       }
       this._activeEnterEffect = row.effect;
@@ -848,13 +848,13 @@ class GameLevel {
   }
   // scroll-based enter/exit motion for deco (from enterEffect triggers)
   // beat synced rods use _eeAudioScale + updateAudioScale instead
-  applyEnterEffects(p14239) {
+  applyEnterEffects(cameraX) {
     const secW = 400;
     const margin = 140;
     const slidePx = 200;
-    const camX = p14239;
-    const camRight = p14239 + gameWidth;
-    const camCenterX = p14239 + gameWidth / 2;
+    const camX = cameraX;
+    const camRight = cameraX + gameWidth;
+    const camCenterX = cameraX + gameWidth / 2;
     const secFirst = Math.max(0, Math.floor((camX - margin) / secW));
     const secLast = Math.min(this._sections.length - 1, Math.floor((camRight + margin) / secW));
     for (let si = secFirst; si <= secLast; si++) {
@@ -941,18 +941,18 @@ class GameLevel {
       }
     }
   }
-  setGroundColor(p14240) {
+  setGroundColor(groundTint) {
     for (let g of this._groundTiles) {
-      g.setTint(p14240);
+      g.setTint(groundTint);
     }
     for (let c of this._ceilingTiles) {
-      c.setTint(p14240);
+      c.setTint(groundTint);
     }
   }
   // rod/orb sprites with _eeAudioScale - beat pulses from logic in GameScene (not enterEffect)
-  updateAudioScale(p14241) {
+  updateAudioScale(scaleValue) {
     for (let s of this._audioScaleSprites) {
-      s.setScale(p14241);
+      s.setScale(scaleValue);
     }
   }
   resetVisibility() {
