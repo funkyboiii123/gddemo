@@ -7,7 +7,7 @@ import { fileURLToPath } from "url";
 const root = path.dirname(fileURLToPath(import.meta.url));
 const src = path.join(root, "src");
 const manifest = path.join(src, "manifest.json");
-const depfile = path.join(src, "DependencySlop.js");
+const depfile = path.join(src, "dependencies", "phaser.js");
 const outfile = path.join(root, "dist.js");
 const strip = process.env.STRIP_GAME_BANNERS !== "0";
 
