@@ -21,9 +21,9 @@ function setSceneRenderZoom(scene) {
 
 const bgParallaxDrop = 180;
 let viewportHalfMinus150 = gameWidth / 2 - 150;
-function setGameWidthFromMinHeight(p13980) {
-  gameWidth = p13980;
-  viewportHalfMinus150 = p13980 / 2 - 150;
+function setGameWidthFromMinHeight(minGameWidth) {
+  gameWidth = minGameWidth;
+  viewportHalfMinus150 = minGameWidth / 2 - 150;
 }
 const physicsFixedDt = 1 / 240;
 const scrollVelocityMul = 11.540004;
@@ -37,8 +37,8 @@ const collisionHazard = "hazard";
 const collisionPortalFly = "portal_fly";
 const collisionPortalCube = "portal_cube";
 const groundBaselineY = 460;
-function gameYToWorldY(p13981) {
-  return groundBaselineY - p13981;
+function gameYToWorldY(gameY) {
+  return groundBaselineY - gameY;
 }
 let blendAdditive = Phaser.BlendModes.ADD;
 let blendNormal = Phaser.BlendModes.NORMAL;
