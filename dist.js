@@ -94678,495 +94678,6 @@ module.exports = {
 };
  })
 });
-const s = t(e ? i.exports : (e = 1, i.exports = (() => {
-  var moduleFactories = globalThis.__GD_MODULE_MAP;
-  var moduleCache = {};
-  function requireModule(moduleId) {
-    var cached = moduleCache[moduleId];
-    if (cached !== undefined) {
-      return cached.exports;
-    }
-    var moduleRecord = moduleCache[moduleId] = {
-      exports: {}
-    };
-    moduleFactories[moduleId](moduleRecord, moduleRecord.exports, requireModule);
-    return moduleRecord.exports;
-  }
-  requireModule.g = function () {
-    if (typeof globalThis == "object") {
-      return globalThis;
-    }
-    try {
-      return this || new Function("return this")();
-    } catch (e16) {
-      if (typeof window == "object") {
-        return window;
-      }
-    }
-  }();
-  return requireModule(85454);
-})()));
-const spriteQuality = "ld"; // ld or hd
-let gameWidth = Math.round(10240 / 9);
-const gameHeight = 640;
-const renderScale = spriteQuality === "hd" ? 2 : 1;
-const gridCellPx = 60;
-function setSceneRenderZoom(scene) {
-  const z = renderScale;
-  if (typeof z !== "number" || z <= 0) {return}
-  const list = scene.cameras.cameras;
-  for (let i = 0; i < list.length; i++) {
-    const cam = list[i];
-    if (z > 1) {
-      cam.setOrigin(0, 0);
-      cam.setZoom(z);
-    } else {
-      cam.setOrigin(0.5, 0.5);
-      cam.setZoom(1);
-    }
-  }
-}
-
-const bgParallaxDrop = 180;
-let viewportHalfMinus150 = gameWidth / 2 - 150;
-function setGameWidthFromMinHeight(minGameWidth) {
-  gameWidth = minGameWidth;
-  viewportHalfMinus150 = minGameWidth / 2 - 150;
-}
-const physicsFixedDt = 1 / 240;
-const scrollVelocityMul = 11.540004;
-const inputSmoothingMul = 0.9;
-const gravityMul = 1.916398;
-const ceilingExtraPx = 600;
-const tintLimeGreen = 65280;
-const tintWhite = 65535;
-const collisionSolid = "solid";
-const collisionHazard = "hazard";
-const collisionPortalFly = "portal_fly";
-const collisionPortalCube = "portal_cube";
-const groundBaselineY = 460;
-function gameYToWorldY(gameY) {
-  return groundBaselineY - gameY;
-}
-let blendAdditive = Phaser.BlendModes.ADD;
-let blendNormal = Phaser.BlendModes.NORMAL;
-function imagePathWithHdSuffix(path) {
-  return path.replace(/\.(png|jpg|jpeg|webp)$/i, "-hd.$1");
-}
-
-function imagePathForSpriteQuality(ldPath) {
-  if (spriteQuality !== "hd") {
-    return ldPath;
-  }
-  return imagePathWithHdSuffix(ldPath);
-}
-
-function fontFntPathWithHdSuffix(path) {
-  return path.replace(/\.fnt$/i, "-hd.fnt");
-}
-function fontFntPathForSpriteQuality(ldPath) {
-  if (spriteQuality !== "hd") {
-    return ldPath;
-  }
-  return fontFntPathWithHdSuffix(ldPath);
-}
-
-function scaleAtlasJsonForDoubleResolution(json) {
-  const out = JSON.parse(JSON.stringify(json));
-  const textures = out.textures;
-  if (!textures) {
-    return out;
-  }
-  for (let ti = 0; ti < textures.length; ti++) {
-    const tex = textures[ti];
-    if (tex.size) {
-      if (typeof tex.size.w === "number") {
-        tex.size.w *= 2;
-      }
-      if (typeof tex.size.h === "number") {
-        tex.size.h *= 2;
-      }
-    }
-    const frames = tex.frames;
-    if (!frames) {
-      continue;
-    }
-    for (let fi = 0; fi < frames.length; fi++) {
-      const fr = frames[fi];
-      if (fr.frame) {
-        fr.frame.x *= 2;
-        fr.frame.y *= 2;
-        fr.frame.w *= 2;
-        fr.frame.h *= 2;
-      }
-    }
-  }
-  return out;
-}
-
-function loadJsonSync(url) {
-  const xhr = new XMLHttpRequest();
-  xhr.open("GET", url, false);
-  xhr.send(null);
-  if (xhr.status !== 200 && xhr.status !== 0) {
-    throw new Error("Failed to load JSON: " + url + " (status " + xhr.status + ")");
-  }
-  return JSON.parse(xhr.responseText);
-}
-
-const HDTextureKeys = new Set(["GJ_WebSheet", "game_bg_01", "sliderBar", "square04_001", "GJ_square02"]);
-
-function installHdWebglSpriteQuadPatch(game) {
-  if (spriteQuality !== "hd" || !game || !game.renderer) {
-    return;
-  }
-  if (game.renderer.type !== Phaser.WEBGL && game.renderer.type !== 2) {
-    return;
-  }
-  const Pipelines = Phaser.Renderer && Phaser.Renderer.WebGL && Phaser.Renderer.WebGL.Pipelines;
-  const MP = Pipelines && Pipelines.MultiPipeline;
-  if (!MP || !MP.prototype || !MP.prototype.batchSprite || MP.prototype.__hdQuadPatchInstalled) {
-    return;
-  }
-  const orig = MP.prototype.batchSprite;
-  MP.prototype.batchSprite = function (gameObject, camera, parentMatrix) {
-    if (gameObject.isCropped) {
-      return orig.call(this, gameObject, camera, parentMatrix);
-    }
-    const frame = gameObject.frame;
-    if (!frame || frame.rotated) {
-      return orig.call(this, gameObject, camera, parentMatrix);
-    }
-    const texKey = frame.texture.key;
-    if (!HDTextureKeys.has(texKey)) {
-      return orig.call(this, gameObject, camera, parentMatrix);
-    }
-    const cw = frame.cutWidth;
-    const ch = frame.cutHeight;
-    const fw = frame.width;
-    const fh = frame.height;
-    if (!(cw > fw + 0.5 || ch > fh + 0.5)) {
-      return orig.call(this, gameObject, camera, parentMatrix);
-    }
-    frame.cutWidth = fw;
-    frame.cutHeight = fh;
-    try {
-      return orig.call(this, gameObject, camera, parentMatrix);
-    } finally {
-      frame.cutWidth = cw;
-      frame.cutHeight = ch;
-    }
-  };
-  MP.prototype.__hdQuadPatchInstalled = true;
-}
-
-function applyHdTextureSizeFixes(scene) {
-  if (spriteQuality !== "hd") {
-    return;
-  }
-  const atlasKey = "GJ_WebSheet";
-  if (scene.textures.exists(atlasKey)) {
-    const atlasTex = scene.textures.get(atlasKey);
-    const src0 = atlasTex.source[0];
-    if (src0) {
-      src0.resolution = 2;
-    }
-    const frameNames = atlasTex.getFrameNames();
-    for (let i = 0; i < frameNames.length; i++) {
-      const name = frameNames[i];
-      if (name === "__BASE") {
-        continue;
-      }
-      const frame = atlasTex.get(name);
-      if (!frame || frame.trimmed) {
-        continue;
-      }
-      const cd = frame.customData;
-      if (!cd || !cd.sourceSize || !cd.spriteSourceSize) {
-        continue;
-      }
-      const ss = cd.sourceSize;
-      const sss = cd.spriteSourceSize;
-      frame.setTrim(ss.w, ss.h, sss.x, sss.y, sss.w, sss.h);
-    }
-  }
-  const hdStandalone = scene._hdStandaloneKeys;
-  if (hdStandalone && hdStandalone.size) {
-    hdStandalone.forEach(key => {
-      if (!scene.textures.exists(key)) {
-        return;
-      }
-      const tex = scene.textures.get(key);
-      const s = tex.source[0];
-      if (s) {
-        s.resolution = 2;
-      }
-      const fr = tex.get();
-      if (!fr || fr.trimmed) {
-        return;
-      }
-      const cw = fr.cutWidth;
-      const ch = fr.cutHeight;
-      if (cw <= 0 || ch <= 0) {
-        return;
-      }
-      fr.setTrim(cw / 2, ch / 2, 0, 0, cw / 2, ch / 2);
-    });
-  }
-  installHdWebglSpriteQuadPatch(scene.game);
-}
-class BootScene extends Phaser.Scene {
-  constructor() {
-    super({
-      key: "BootScene"
-    });
-  }
-  preload() {
-    setSceneRenderZoom(this);
-    (function (game) {
-      if (game.renderer.type === Phaser.WEBGL) {
-        let gl = game.renderer.gl;
-        blendAdditive = game.renderer.addBlendMode([gl.SRC_ALPHA, gl.ONE], gl.FUNC_ADD);
-        blendNormal = game.renderer.addBlendMode([gl.DST_COLOR, gl.ONE_MINUS_SRC_ALPHA], gl.FUNC_ADD);
-      }
-    })(this.game);
-    const camWidth = gameWidth;
-    const camHeight = gameHeight;
-    let barWidth = camWidth * 0.6;
-    let progressBar = this.add.rectangle(camWidth / 2, camHeight / 2, barWidth, 8, 65280).setOrigin(0.5, 0.5);
-    progressBar.scaleX = 0;
-    this.load.on("progress", loadRatio => {
-      progressBar.scaleX = loadRatio;
-    });
-    this._hdStandaloneKeys = spriteQuality === "hd" ? new Set(["game_bg_01", "sliderBar", "square04_001", "GJ_square02"]) : new Set();
-    this.load.on("loaderror", file => {
-      if (spriteQuality !== "hd" || !file) {
-        return;
-      }
-      const url = file.url || "";
-      if (file.key === "bigFontFnt" && url.indexOf("-hd.fnt") >= 0) {
-        this.load.text("bigFontFnt", "assets/fonts/bigFont.fnt");
-        this.load.image("bigFont", "assets/fonts/bigFont.png");
-        this.load.start();
-        return;
-      }
-      if (file.key === "goldFontFnt" && url.indexOf("-hd.fnt") >= 0) {
-        this.load.text("goldFontFnt", "assets/fonts/goldFont.fnt");
-        this.load.image("goldFont", "assets/fonts/goldFont.png");
-        this.load.start();
-        return;
-      }
-      if (file.type !== "image") {
-        return;
-      }
-      if (file.key === "GJ_WebSheet") {
-        return;
-      }
-      if (!url || url.indexOf("-hd.") < 0) {
-        return;
-      }
-      const ldUrl = url.replace("-hd.", ".");
-      if (ldUrl === url) {
-        return;
-      }
-      if (file.key === "bigFont") {
-        this.load.image("bigFont", ldUrl);
-        this.load.text("bigFontFnt", "assets/fonts/bigFont.fnt");
-        this.load.start();
-        return;
-      }
-      if (file.key === "goldFont") {
-        this.load.image("goldFont", ldUrl);
-        this.load.text("goldFontFnt", "assets/fonts/goldFont.fnt");
-        this.load.start();
-        return;
-      }
-      if (this._hdStandaloneKeys) {
-        this._hdStandaloneKeys.delete(file.key);
-      }
-      this.load.image(file.key, ldUrl);
-      this.load.start();
-    });
-
-    // paths for all non-script assets, make sure to change this when renaming anything!
-    let gjAtlasData = loadJsonSync("assets/data/GJ_WebSheet.json");
-    if (spriteQuality === "hd") {gjAtlasData = scaleAtlasJsonForDoubleResolution(gjAtlasData)}
-    this.load.atlas("GJ_WebSheet", imagePathForSpriteQuality("assets/images/GJ_WebSheet.png"), gjAtlasData);
-    this.load.image("bigFont", imagePathForSpriteQuality("assets/fonts/bigFont.png"));
-    this.load.text("bigFontFnt", fontFntPathForSpriteQuality("assets/fonts/bigFont.fnt"));
-    this.load.image("goldFont", imagePathForSpriteQuality("assets/fonts/goldFont.png"));
-    this.load.text("goldFontFnt", fontFntPathForSpriteQuality("assets/fonts/goldFont.fnt"));
-    this.load.image("game_bg_01", imagePathForSpriteQuality("assets/images/game_bg_01_001.png"));
-    this.load.image("sliderBar", imagePathForSpriteQuality("assets/images/sliderBar.png"));
-    this.load.image("square04_001", imagePathForSpriteQuality("assets/images/square04_001.png"));
-    this.load.image("GJ_square02", imagePathForSpriteQuality("assets/images/GJ_square02.png"));
-    this.load.text("level_1", "assets/data/level.txt");
-    this.load.json("gjObjects", "assets/data/objects.json");
-    this.load.audio("stereo_madness", "assets/audio/StereoMadness.mp3");
-    this.load.audio("explode_11", "assets/audio/explode_11.ogg");
-    this.load.audio("endStart_02", "assets/audio/endStart_02.ogg");
-    this.load.audio("playSound_01", "assets/audio/playSound_01.ogg");
-    this.load.audio("quitSound_01", "assets/audio/quitSound_01.ogg");
-    this.load.audio("highscoreGet02", "assets/audio/highscoreGet02.ogg");
-
-  }
-  create() {
-    applyHdTextureSizeFixes(this);
-    initobjectsFromJson(this.cache.json.get("gjObjects"));
-    this.cache.text.get("level_1");
-    const bigFontFntText = this.cache.text.get("bigFontFnt");
-    if (bigFontFntText) {
-      registerBitmapFontFromFnt(this, "bigFont", bigFontFntText);
-    }
-    const goldFontFntText = this.cache.text.get("goldFontFnt");
-    if (goldFontFntText) {
-      registerBitmapFontFromFnt(this, "goldFont", goldFontFntText);
-    }
-    this.scene.start("GameScene");
-  }
-}
-// parses bmfont .fnt text and registers a phaser bitmap font from the atlas texture
-function registerBitmapFontFromFnt(scene, textureKey, fntText) {
-  const atlasTexture = scene.textures.get(textureKey);
-  const imageSource = atlasTexture.source[0];
-  const texWidth = imageSource.width;
-  const texHeight = imageSource.height;
-  const fontData = {
-    font: textureKey,
-    size: 0,
-    lineHeight: 0,
-    chars: {}
-  };
-  const kerningPairs = [];
-  for (const lineStr of fntText.split("\n")) {
-    const tokens = lineStr.trim().split(/\s+/);
-    if (!tokens.length) {
-      continue;
-    }
-    const tag = tokens[0];
-    const attrs = {};
-    for (let ti = 1; ti < tokens.length; ti++) {
-      const eqIdx = tokens[ti].indexOf("=");
-      if (eqIdx >= 0) {
-        attrs[tokens[ti].slice(0, eqIdx)] = tokens[ti].slice(eqIdx + 1).replace(/^"|"$/g, "");
-      }
-    }
-    if (tag === "info") {
-      fontData.size = parseInt(attrs.size, 10);
-    } else if (tag === "common") {
-      fontData.lineHeight = parseInt(attrs.lineHeight, 10);
-    } else if (tag === "char") {
-      const charId = parseInt(attrs.id, 10);
-      const x = parseInt(attrs.x, 10);
-      const y = parseInt(attrs.y, 10);
-      const width = parseInt(attrs.width, 10);
-      const height = parseInt(attrs.height, 10);
-      const texU0 = x / texWidth;
-      const texV0 = y / texHeight;
-      const texU1 = (x + width) / texWidth;
-      const texV1 = (y + height) / texHeight;
-      fontData.chars[charId] = {
-        x,
-        y,
-        width,
-        height,
-        centerX: Math.floor(width / 2),
-        centerY: Math.floor(height / 2),
-        xOffset: parseInt(attrs.xoffset, 10),
-        yOffset: parseInt(attrs.yoffset, 10),
-        xAdvance: parseInt(attrs.xadvance, 10),
-        data: {},
-        kerning: {},
-        u0: texU0,
-        v0: texV0,
-        u1: texU1,
-        v1: texV1
-      };
-      if (width !== 0 && height !== 0) {
-        const charStr = String.fromCharCode(charId);
-        const charFrame = atlasTexture.add(charStr, 0, x, y, width, height);
-        if (charFrame) {
-          charFrame.setUVs(width, height, texU0, texV0, texU1, texV1);
-        }
-      }
-    } else if (tag === "kerning") {
-      kerningPairs.push({
-        first: parseInt(attrs.first, 10),
-        second: parseInt(attrs.second, 10),
-        amount: parseInt(attrs.amount, 10)
-      });
-    }
-  }
-  for (const kp of kerningPairs) {
-    if (fontData.chars[kp.second]) {
-      fontData.chars[kp.second].kerning[kp.first] = kp.amount;
-    }
-  }
-  scene.cache.bitmapFont.add(textureKey, {
-    data: fontData,
-    texture: textureKey,
-    frame: null
-  });
-}
-class PlayerPhysicsState {
-  constructor() {
-    this.reset();
-  }
-  reset() {
-    this.y = 30;
-    this.lastY = 30;
-    this.lastGroundPosY = 30;
-    this.yVelocity = 0;
-    this.onGround = true;
-    this.canJump = true;
-    this.isJumping = false;
-    this.gravityFlipped = false;
-    this.isFlying = false;
-    this.wasBoosted = false;
-    this.collideTop = 0;
-    this.collideBottom = 0;
-    this.onCeiling = false;
-    this.upKeyDown = false;
-    this.upKeyPressed = false;
-    this.isDead = false;
-  }
-}
-const TEXTURE_ATLAS_KEYS = ["GJ_WebSheet"];
-
-function resolveAtlasFrame(scene, frameKey) {
-  for (let atlasKey of TEXTURE_ATLAS_KEYS) {
-    if (scene.textures.exists(atlasKey)) {
-      if (scene.textures.get(atlasKey).has(frameKey)) {
-        return {
-          atlas: atlasKey,
-          frame: frameKey
-        };
-      }
-    }
-  }
-  return null;
-}
-
-function addAtlasOrStandaloneImage(scene, x, y, textureKeyOrFrame) {
-  const hit = resolveAtlasFrame(scene, textureKeyOrFrame);
-  if (hit) {
-    return scene.add.image(x, y, hit.atlas, hit.frame);
-  }
-  if (scene.textures.exists(textureKeyOrFrame)) {
-    return scene.add.image(x, y, textureKeyOrFrame);
-  }
-  return null;
-}
-class CollisionRect {
-  constructor(type, x, y, width, height) {
-    this.type = type;
-    this.x = x;
-    this.y = y;
-    this.w = width;
-    this.h = height;
-    this.activated = false;
-  }
-}
 (function (global, factory) {
   typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports) :
   typeof define === 'function' && define.amd ? define(['exports'], factory) :
@@ -99489,105 +99000,391 @@ class CollisionRect {
   Object.defineProperty(exports, '__esModule', { value: true });
 })));
 var zlibExports = globalThis.pako;
-// level string parsing for the level format
-function parseGjLevelObjectRecord(recordText) {
-  const fields = recordText.split(",");
-  const rawByKey = {};
-
-  for (let i = 0; i + 1 < fields.length; i += 2) {
-    const key = parseInt(fields[i], 10);
-    const value = fields[i + 1];
-    rawByKey[key] = value;
-  }
-  const objectId = parseInt(rawByKey[1] || "0", 10);
-  if (objectId === 0) {
-    return null;
-  }
-  return {
-    id: objectId,
-    x: parseFloat(rawByKey[2] || "0"),
-    y: parseFloat(rawByKey[3] || "0"),
-    flipX: rawByKey[4] === "1",
-    flipY: rawByKey[5] === "1",
-    rot: parseFloat(rawByKey[6] || "0"),
-    scale: parseFloat(rawByKey[32] || "1"),
-    zLayer: parseInt(rawByKey[24] || "0", 10),
-    zOrder: parseInt(rawByKey[25] || "0", 10),
-    groups: rawByKey[57] || "",
-    color1: parseInt(rawByKey[21] || "0", 10),
-    color2: parseInt(rawByKey[22] || "0", 10),
-    _raw: rawByKey
-  };
-}
-
-function parseCompressedGjLevelString(levelBase64) {
-  const normalizedBase64 = (function normalizeBase64(raw) {
-    let padded = raw.replace(/-/g, "+").replace(/_/g, "/");
-    while (padded.length % 4 !== 0) {
-      padded += "=";
+const s = t(e ? i.exports : (e = 1, i.exports = (() => {
+  var moduleFactories = globalThis.__GD_MODULE_MAP;
+  var moduleCache = {};
+  function requireModule(moduleId) {
+    var cached = moduleCache[moduleId];
+    if (cached !== undefined) {
+      return cached.exports;
     }
-    return padded;
-  })(levelBase64.trim());
-
-  const binary = atob(normalizedBase64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
+    var moduleRecord = moduleCache[moduleId] = {
+      exports: {}
+    };
+    moduleFactories[moduleId](moduleRecord, moduleRecord.exports, requireModule);
+    return moduleRecord.exports;
   }
-
-  const inflated = zlibExports.inflate(bytes);
-  const decoded = new TextDecoder().decode(inflated);
-
-  const parts = decoded.split(";");
-  const settingsHeader = parts.length > 0 ? parts[0] : "";
-  const objects = [];
-
-  for (let i = 1; i < parts.length; i++) {
-    if (parts[i].length === 0) {
-      continue;
+  requireModule.g = function () {
+    if (typeof globalThis == "object") {
+      return globalThis;
     }
-    const parsedObject = parseGjLevelObjectRecord(parts[i]);
-    if (parsedObject) {
-      objects.push(parsedObject);
+    try {
+      return this || new Function("return this")();
+    } catch (e16) {
+      if (typeof window == "object") {
+        return window;
+      }
     }
-  }
-
-  return {
-    settings: settingsHeader,
-    objects
-  };
-}
-// object type tags used by the registry and GameLevel collision/spawn logic
-const objectTypeDeco = "deco";
-const objectTypePortal = "portal";
-const objectTypePad = "pad";
-const objectTypeRing = "ring";
-const objectTypeTrigger = "trigger";
-const objectTypeSpeed = "speed";
-const objectTypeFlyMode = "fly";
-const objectTypeCubeMode = "cube";
-
-// object registry data: assets/data/objects.json (loaded in BootScene, see initobjectsFromJson)
-let gjObjectById = {};
-function initobjectsFromJson(pack) {
-  gjObjectById = {};
-  if (!pack || typeof pack.objects !== "object") {
-    return;
-  }
-  const raw = pack.objects;
-  for (const key of Object.keys(raw)) {
-    gjObjectById[+key] = raw[key];
-  }
-  const glowIds = pack.glowObjectIds || [];
-  for (let gi = 0; gi < glowIds.length; gi++) {
-    const oid = glowIds[gi];
-    if (gjObjectById[oid]) {
-      gjObjectById[oid].glow = true;
+  }();
+  return requireModule(85454);
+})()));
+const spriteQuality = "ld"; // ld or hd
+let gameWidth = Math.round(10240 / 9);
+const gameHeight = 640;
+const renderScale = spriteQuality === "hd" ? 2 : 1;
+const gridCellPx = 60;
+function setSceneRenderZoom(scene) {
+  const z = renderScale;
+  if (typeof z !== "number" || z <= 0) {return}
+  const list = scene.cameras.cameras;
+  for (let i = 0; i < list.length; i++) {
+    const cam = list[i];
+    if (z > 1) {
+      cam.setOrigin(0, 0);
+      cam.setZoom(z);
+    } else {
+      cam.setOrigin(0.5, 0.5);
+      cam.setZoom(1);
     }
   }
 }
-function getGjObjectById(objectId) {
-  return gjObjectById[objectId] || null;
+
+const bgParallaxDrop = 180;
+let viewportHalfMinus150 = gameWidth / 2 - 150;
+function setGameWidthFromMinHeight(minGameWidth) {
+  gameWidth = minGameWidth;
+  viewportHalfMinus150 = minGameWidth / 2 - 150;
+}
+const physicsFixedDt = 1 / 240;
+const scrollVelocityMul = 11.540004;
+const inputSmoothingMul = 0.9;
+const gravityMul = 1.916398;
+const ceilingExtraPx = 600;
+const tintLimeGreen = 65280;
+const tintWhite = 65535;
+const collisionSolid = "solid";
+const collisionHazard = "hazard";
+const collisionPortalFly = "portal_fly";
+const collisionPortalCube = "portal_cube";
+const groundBaselineY = 460;
+function gameYToWorldY(gameY) {
+  return groundBaselineY - gameY;
+}
+let blendAdditive = Phaser.BlendModes.ADD;
+let blendNormal = Phaser.BlendModes.NORMAL;
+const PauseKind = {
+  REPLAY: "pauseReplay",
+  RESUME: "pauseResume",
+  MENU: "pauseMenu"
+};
+const EndKind = {
+  REPLAY: "endReplay",
+  MENU: "endMenu"
+};
+const GDRegistry = {
+  PauseReturnFadeIn: "pauseReturnFadeIn",
+  FadeInFromBlack: "fadeInFromBlack"
+};
+const SceneFadeMs = {
+  PauseMenuOut: 250,
+  PauseMenuIn: 250,
+  EndMenuOut: 400,
+  EndMenuIn: 400
+};
+
+const CreditsLink = "https://www.youtube.com/watch?v=JhKyKEDxo8Q";
+
+const MenuLinks = [{
+  key: "downloadSteam_001",
+  url: "https://store.steampowered.com/app/322170/Geometry_Dash"
+}, {
+  key: "downloadGoogle_001",
+  url: "https://play.google.com/store/apps/details?id=com.robtopx.geometryjump&hl=en"
+}, {
+  key: "downloadApple_001",
+  url: "https://apps.apple.com/us/app/geometry-dash/id625334537"
+}];
+
+const EndScreenLinks = [{
+  key: "downloadApple_001",
+  url: "https://apps.apple.com/us/app/geometry-dash/id625334537"
+}, {
+  key: "downloadGoogle_001",
+  url: "https://play.google.com/store/apps/details?id=com.robtopx.geometryjump&hl=en"
+}, {
+  key: "downloadSteam_001",
+  url: "https://store.steampowered.com/app/322170/Geometry_Dash"
+}];
+
+const PauseButtons = [{
+  frame: "GJ_replayBtn_001.png",
+  kind: PauseKind.REPLAY
+}, {
+  frame: "GJ_playBtn2_001.png",
+  kind: PauseKind.RESUME
+}, {
+  frame: "GJ_menuBtn_001.png",
+  kind: PauseKind.MENU
+}];
+
+const EndScreenButtons = [{
+  frame: "GJ_replayBtn_001.png",
+  dx: -200,
+  kind: EndKind.REPLAY
+}, {
+  frame: "GJ_menuBtn_001.png",
+  dx: 200,
+  kind: EndKind.MENU
+}];
+// not much is here since we're immediately moving into LoadingScene.js
+class BootScene extends Phaser.Scene {
+  constructor() {
+    super({
+      key: "BootScene"
+    });
+  }
+  preload() {
+    setSceneRenderZoom(this);
+    (function (game) {
+      if (game.renderer.type === Phaser.WEBGL) {
+        let gl = game.renderer.gl;
+        blendAdditive = game.renderer.addBlendMode([gl.SRC_ALPHA, gl.ONE], gl.FUNC_ADD);
+        blendNormal = game.renderer.addBlendMode([gl.DST_COLOR, gl.ONE_MINUS_SRC_ALPHA], gl.FUNC_ADD);
+      }
+    })(this.game);
+    let gjAtlasData = loadJsonSync("assets/data/GJ_WebSheet.json");
+    if (spriteQuality === "hd") {gjAtlasData = scaleAtlasJsonForDoubleResolution(gjAtlasData)}
+    this.load.atlas("GJ_WebSheet", imagePathForSpriteQuality("assets/images/GJ_WebSheet.png"), gjAtlasData);
+    this.load.image("game_bg_01", imagePathForSpriteQuality("assets/images/game_bg_01_001.png"));
+    this.load.image("sliderBar", imagePathForSpriteQuality("assets/images/sliderBar.png"));
+    this.load.image("goldFont", imagePathForSpriteQuality("assets/fonts/goldFont.png"));
+    this.load.text("goldFontFnt", fontFntPathForSpriteQuality("assets/fonts/goldFont.fnt"));
+  }
+  create() {
+    applyHdTextureSizeFixes(this);
+    const goldFontFntText = this.cache.text.get("goldFontFnt");
+    if (goldFontFntText) {
+      registerBitmapFontFromFnt(this, "goldFont", goldFontFntText);
+    }
+    this.scene.start("LoadingScene");
+  }
+}
+class LoadingScene extends Phaser.Scene {
+  constructor() {
+    super({
+      key: "LoadingScene"
+    });
+    this._bgTiles = [];
+    this._progressBars = [];
+  }
+
+  _pickRandomSplashLine() {
+    try {
+      const xhr = new XMLHttpRequest();
+      xhr.open("GET", "assets/data/splashes.txt", false);
+      xhr.send(null);
+      if (xhr.status !== 200 && xhr.status !== 0) {
+        return "Loading resources";
+      }
+      const lines = xhr.responseText.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+      if (lines.length < 1) {
+        return "Loading resources";
+      }
+      return lines[Math.floor(Math.random() * lines.length)];
+    } catch (_err) {
+      return "Loading resources";
+    }
+  }
+
+  _buildLoadingLayout() {
+    const camWidth = gameWidth;
+    const camHeight = gameHeight;
+
+    const bgTexture = this.textures.get("game_bg_01");
+    const bgFrame = bgTexture.get();
+    const tileW = bgFrame.width;
+    const tileH = bgFrame.height;
+    const cols = Math.ceil(camWidth / tileW) + 1;
+    const rows = Math.ceil(camHeight / tileH) + 1;
+
+    for (let yi = 0; yi < rows; yi++) {
+      for (let xi = 0; xi < cols; xi++) {
+        const bg = this.add.image(xi * tileW, yi * tileH, "game_bg_01")
+          .setOrigin(0, 0)
+          .setScrollFactor(0)
+          .setDepth(-10);
+        bg.setTint(Phaser.Display.Color.GetColor(0, 102, 255));
+        this._bgTiles.push(bg);
+      }
+    }
+
+    this.add.image(camWidth / 2, camHeight / 2 - 140, "GJ_WebSheet", "RobTopLogoBig_001.png")
+      .setOrigin(0.5, 0.5)
+      .setScale(0.9)
+      .setDepth(10);
+
+    this.add.image(camWidth / 2, camHeight / 2 - 15, "GJ_WebSheet", "GJ_logo_001.png")
+      .setOrigin(0.5, 0.5)
+      .setDepth(10);
+    this.add.image(camWidth / 2, camHeight / 2 + 67.5, "GJ_WebSheet", "tryMe_001.png")
+      .setOrigin(0.5, 0.5)
+      .setDepth(10);
+
+    const sliderScale = 0.9;
+    const grooveFrame = this.textures.getFrame("GJ_WebSheet", "slidergroove.png");
+    const grooveWidth = grooveFrame ? grooveFrame.width : 400;
+    const trackW = (grooveWidth - 8) * sliderScale;
+    const sliderYs = [camHeight / 2 + 165]; // don't put multiple entries here, it creates multiple identical sliders lol 😭 
+
+    for (let i = 0; i < sliderYs.length; i++) {
+      const y = sliderYs[i];
+      const trackLeft = camWidth / 2 - grooveWidth * sliderScale / 2 + 2.8;
+      const fill = this.add.tileSprite(trackLeft, y, 1, 11.2, "sliderBar")
+        .setOrigin(0, 0.5)
+        .setDepth(11);
+      fill.setVisible(false);
+      const groove = this.add.image(camWidth / 2, y, "GJ_WebSheet", "slidergroove.png")
+        .setScale(sliderScale)
+        .setDepth(12);
+      this._progressBars.push({
+        fill,
+        width: trackW
+      });
+    }
+
+    const splash = this._pickRandomSplashLine();
+    if (this.cache.bitmapFont.exists("goldFont")) {
+      this._splashText = this.add.bitmapText(camWidth / 2, camHeight / 2 + 238, "goldFont", splash, 40)
+        .setOrigin(0.5, 0.5)
+        .setScale(0.75)
+        .setDepth(12);
+    } else {
+      this._splashText = this.add.text(camWidth / 2, camHeight / 2 + 248, splash, {
+        fontSize: "26px",
+        color: "#f7d45a",
+        fontFamily: "Arial",
+        align: "center",
+        stroke: "#8c6c10",
+        strokeThickness: 4
+      }).setOrigin(0.5, 0.5).setDepth(12);
+    }
+  }
+
+  _setProgress(progress01) {
+    const p = Math.max(0, Math.min(1, progress01));
+    for (let i = 0; i < this._progressBars.length; i++) {
+      const bar = this._progressBars[i];
+      const fillWidth = Math.floor(bar.width * p);
+      if (fillWidth > 0) {
+        bar.fill.setVisible(true);
+        bar.fill.width = fillWidth;
+      } else {
+        bar.fill.setVisible(false);
+      }
+    }
+  }
+
+  preload() {
+    setSceneRenderZoom(this);
+    this._buildLoadingLayout();
+    this._setProgress(0);
+
+    this._hdStandaloneKeys = spriteQuality === "hd" ? new Set(["game_bg_01", "sliderBar", "square04_001", "GJ_square02"]) : new Set();
+    this.load.on("progress", loadRatio => {
+      this._setProgress(loadRatio);
+    });
+    this.load.on("loaderror", file => {
+      if (spriteQuality !== "hd" || !file) {
+        return;
+      }
+      const url = file.url || "";
+      if (file.key === "bigFontFnt" && url.indexOf("-hd.fnt") >= 0) {
+        this.load.text("bigFontFnt", "assets/fonts/bigFont.fnt");
+        this.load.image("bigFont", "assets/fonts/bigFont.png");
+        this.load.start();
+        return;
+      }
+      if (file.key === "goldFontFnt" && url.indexOf("-hd.fnt") >= 0) {
+        this.load.text("goldFontFnt", "assets/fonts/goldFont.fnt");
+        this.load.image("goldFont", "assets/fonts/goldFont.png");
+        this.load.start();
+        return;
+      }
+      if (file.type !== "image") {
+        return;
+      }
+      if (file.key === "GJ_WebSheet") {
+        return;
+      }
+      if (!url || url.indexOf("-hd.") < 0) {
+        return;
+      }
+      const ldUrl = url.replace("-hd.", ".");
+      if (ldUrl === url) {
+        return;
+      }
+      if (file.key === "bigFont") {
+        this.load.image("bigFont", ldUrl);
+        this.load.text("bigFontFnt", "assets/fonts/bigFont.fnt");
+        this.load.start();
+        return;
+      }
+      if (file.key === "goldFont") {
+        this.load.image("goldFont", ldUrl);
+        this.load.text("goldFontFnt", "assets/fonts/goldFont.fnt");
+        this.load.start();
+        return;
+      }
+      if (this._hdStandaloneKeys) {
+        this._hdStandaloneKeys.delete(file.key);
+      }
+      this.load.image(file.key, ldUrl);
+      this.load.start();
+    });
+
+    this.load.image("bigFont", imagePathForSpriteQuality("assets/fonts/bigFont.png"));
+    this.load.text("bigFontFnt", fontFntPathForSpriteQuality("assets/fonts/bigFont.fnt"));
+    if (!this.textures.exists("goldFont")) {
+      this.load.image("goldFont", imagePathForSpriteQuality("assets/fonts/goldFont.png"));
+    }
+    if (!this.cache.text.exists("goldFontFnt")) {
+      this.load.text("goldFontFnt", fontFntPathForSpriteQuality("assets/fonts/goldFont.fnt"));
+    }
+    this.load.image("square04_001", imagePathForSpriteQuality("assets/images/square04_001.png"));
+    this.load.image("GJ_square02", imagePathForSpriteQuality("assets/images/GJ_square02.png"));
+    this.load.text("level_1", "assets/data/level.txt");
+    this.load.json("gjObjects", "assets/data/objects.json");
+    this.load.audio("stereo_madness", "assets/audio/StereoMadness.mp3");
+    this.load.audio("explode_11", "assets/audio/explode_11.ogg");
+    this.load.audio("endStart_02", "assets/audio/endStart_02.ogg");
+    this.load.audio("playSound_01", "assets/audio/playSound_01.ogg");
+    this.load.audio("quitSound_01", "assets/audio/quitSound_01.ogg");
+    this.load.audio("highscoreGet02", "assets/audio/highscoreGet02.ogg");
+  }
+
+  create() {
+    this._setProgress(1);
+    applyHdTextureSizeFixes(this);
+    initobjectsFromJson(this.cache.json.get("gjObjects"));
+    this.cache.text.get("level_1");
+
+    const bigFontFntText = this.cache.text.get("bigFontFnt");
+    if (bigFontFntText) {
+      registerBitmapFontFromFnt(this, "bigFont", bigFontFntText);
+    }
+    const goldFontFntText = this.cache.text.get("goldFontFnt");
+    if (goldFontFntText) {
+      registerBitmapFontFromFnt(this, "goldFont", goldFontFntText);
+    }
+
+    this.scene.launch("GameScene");
+    this.scene.bringToTop("LoadingScene");
+    this.game.events.once("gd:gamescene-ready", () => {
+      this.game.events.once("postrender", () => {
+        this.scene.stop("LoadingScene");
+      });
+    });
+  }
 }
 // scrolling ground, object layers by section, collision buckets, color triggers etc
 // portals/blocks/spikes spawn from gjObjectById.
@@ -100559,1645 +100356,6 @@ class GameLevel {
     }
   }
 }
-class ShipTrailRibbon {
-  constructor(scene, _textureKeyUnused, trailSeconds, minDist, strokeWidth, maxSegLen, color = 16777215, opacity = 1) {
-    this._color = color;
-    this._opacity = opacity;
-    this._fadeDelta = 1 / trailSeconds;
-    this._minSegSq = minDist * minDist;
-    this._maxSeg = maxSegLen;
-    this._maxPoints = Math.floor(trailSeconds * 60 + 2) * 5;
-    this._stroke = strokeWidth;
-    this._pts = [];
-    this._posR = {
-      x: 0,
-      y: 0
-    };
-    this._posInit = false;
-    this._active = false;
-    this._gfx = scene.add.graphics();
-    this._gfx.setBlendMode(Phaser.BlendModes.ADD);
-  }
-  addToContainer(container, depth) {
-    container.add(this._gfx);
-    this._gfx.setDepth(depth);
-  }
-  setPosition(x, y) {
-    this._posR.x = x;
-    this._posR.y = y;
-    this._posInit = true;
-  }
-  start() {
-    this._active = true;
-  }
-  stop() {
-    this._active = false;
-  }
-  reset() {
-    this._pts = [];
-    this._posInit = false;
-    this._gfx.clear();
-  }
-  update(deltaSec) {
-    if (!this._posInit) {
-      this._gfx.clear();
-      return;
-    }
-    const fade = deltaSec * this._fadeDelta;
-    let write = 0;
-    for (let i = 0; i < this._pts.length; i++) {
-      this._pts[i].state -= fade;
-      if (this._pts[i].state > 0) {
-        if (write !== i) {
-          this._pts[write] = this._pts[i];
-        }
-        write++;
-      }
-    }
-    this._pts.length = write;
-    if (this._active && this._pts.length < this._maxPoints) {
-      const ptCount = this._pts.length;
-      let addPoint = true;
-      if (ptCount > 0) {
-        const last = this._pts[ptCount - 1];
-        const dx = this._posR.x - last.x;
-        const dy = this._posR.y - last.y;
-        const distSq = dx * dx + dy * dy;
-        if (this._maxSeg > 0 && Math.sqrt(distSq) > this._maxSeg) {
-          this._pts.length = 0;
-        } else if (distSq < this._minSegSq) {
-          addPoint = false;
-        } else if (ptCount > 1) {
-          const prev = this._pts[ptCount - 2];
-          const dx2 = this._posR.x - prev.x;
-          const dy2 = this._posR.y - prev.y;
-          if (dx2 * dx2 + dy2 * dy2 < this._minSegSq * 2) {
-            addPoint = false;
-          }
-        }
-      }
-      if (addPoint) {
-        this._pts.push({
-          x: this._posR.x,
-          y: this._posR.y,
-          state: 1
-        });
-      }
-    }
-    this._gfx.clear();
-    const len = this._pts.length;
-    if (len >= 2) {
-      for (let i = 0; i < len - 1; i++) {
-        const a = this._pts[i];
-        const b = this._pts[i + 1];
-        const lineAlpha = (a.state + b.state) * 0.5 * this._opacity;
-        this._gfx.lineStyle(this._stroke, this._color, lineAlpha);
-        this._gfx.lineBetween(a.x, a.y, b.x, b.y);
-      }
-    }
-  }
-}
-
-function addDepthSpriteFromAtlas(scene, x, y, frameKey, depth, visible) {
-  const resolved = resolveAtlasFrame(scene, frameKey);
-  if (!resolved) {
-    return null;
-  }
-  const img = scene.add.image(x, y, resolved.atlas, resolved.frame);
-  img.setDepth(depth);
-  img.setVisible(visible);
-  return {
-    sprite: img
-  };
-}
-class Player {
-  constructor(scene, physicsState, gameLayer) {
-    this._scene = scene;
-    this.p = physicsState;
-    this._gameLayer = gameLayer;
-    this._rotation = 0;
-    this.rotateActionActive = false;
-    this.rotateActionTime = 0;
-    this.rotateActionDuration = 0;
-    this.rotateActionStart = 0;
-    this.rotateActionTotal = 0;
-    this._showHitboxes = false;
-    this._lastLandObject = null;
-    this._lastXOffset = 0;
-    this._lastCameraX = 0;
-    this._lastCameraY = 0;
-    this._createSprites();
-    this._initParticles(scene);
-    scene.events.on("shutdown", () => this._cleanupExplosion());
-  }
-  _createSprites() {
-    const scene = this._scene;
-    const worldY = gameYToWorldY(this.p.y);
-    const cx = viewportHalfMinus150;
-    this._playerGlowLayer = addDepthSpriteFromAtlas(scene, cx, worldY, "player_01_glow_001.png", 9, false);
-    this._playerSpriteLayer = addDepthSpriteFromAtlas(scene, cx, worldY, "player_01_001.png", 10, true);
-    this._playerOverlayLayer = addDepthSpriteFromAtlas(scene, cx, worldY, "player_01_2_001.png", 8, true);
-    this._playerExtraLayer = addDepthSpriteFromAtlas(scene, cx, worldY, "player_01_extra_001.png", 12, true);
-    if (this._playerGlowLayer) {
-      this._playerGlowLayer.sprite.setTint(tintWhite);
-      this._playerGlowLayer.sprite._glowEnabled = false;
-    }
-    if (this._playerSpriteLayer) {
-      this._playerSpriteLayer.sprite.setTint(tintLimeGreen);
-    } else {
-      let cubeFallback = scene.add.rectangle(cx, worldY, gridCellPx, gridCellPx, tintLimeGreen);
-      cubeFallback.setDepth(10);
-      this._playerSpriteLayer = {
-        sprite: cubeFallback
-      };
-    }
-    if (this._playerOverlayLayer) {
-      this._playerOverlayLayer.sprite.setTint(tintWhite);
-    }
-    this._shipGlowLayer = addDepthSpriteFromAtlas(scene, cx, worldY, "ship_01_glow_001.png", 9, false);
-    this._shipSpriteLayer = addDepthSpriteFromAtlas(scene, cx, worldY, "ship_01_001.png", 10, false);
-    this._shipOverlayLayer = addDepthSpriteFromAtlas(scene, cx, worldY, "ship_01_2_001.png", 8, false);
-    this._shipExtraLayer = addDepthSpriteFromAtlas(scene, cx, worldY, "ship_01_extra_001.png", 12, false);
-    if (this._shipGlowLayer) {
-      this._shipGlowLayer.sprite.setTint(tintWhite);
-      this._shipGlowLayer.sprite._glowEnabled = false;
-    }
-    if (this._shipSpriteLayer) {
-      this._shipSpriteLayer.sprite.setTint(tintLimeGreen);
-    } else {
-      let shipFallback = scene.add.polygon(cx, worldY, [{
-        x: -72,
-        y: 40
-      }, {
-        x: 72,
-        y: 0
-      }, {
-        x: -72,
-        y: -40
-      }, {
-        x: -40,
-        y: 0
-      }], tintLimeGreen);
-      shipFallback.setDepth(10).setVisible(false);
-      this._shipSpriteLayer = {
-        sprite: shipFallback
-      };
-    }
-    if (this._shipOverlayLayer) {
-      this._shipOverlayLayer.sprite.setTint(tintWhite);
-    }
-    this.playerSprite = this._playerSpriteLayer.sprite;
-    this.shipSprite = this._shipSpriteLayer.sprite;
-    this._playerLayers = [this._playerSpriteLayer, this._playerGlowLayer, this._playerOverlayLayer, this._playerExtraLayer];
-    this._shipLayers = [this._shipSpriteLayer, this._shipGlowLayer, this._shipOverlayLayer, this._shipExtraLayer];
-    this._allLayers = [...this._playerLayers, ...this._shipLayers];
-  }
-  _initParticles(scene) {
-    this._particleEmitter = scene.add.particles(0, 0, "GJ_WebSheet", {
-      frame: "square.png",
-      speed: {
-        min: 110,
-        max: 190
-      },
-      angle: {
-        min: 225,
-        max: 315
-      },
-      lifespan: {
-        min: 150,
-        max: 450
-      },
-      scale: {
-        start: 0.5,
-        end: 0
-      },
-      gravityY: 600,
-      frequency: 1000 / 30,
-      blendMode: "ADD",
-      alpha: {
-        start: 1,
-        end: 0
-      },
-      tint: tintLimeGreen
-    });
-    this._particleEmitter.stop();
-    this._particleEmitter.setDepth(9);
-    this._gameLayer.container.add(this._particleEmitter);
-    this._flyParticleEmitter = scene.add.particles(0, 0, "GJ_WebSheet", {
-      frame: "square.png",
-      speed: {
-        min: 22,
-        max: 38
-      },
-      angle: {
-        min: 225,
-        max: 315
-      },
-      lifespan: {
-        min: 150,
-        max: 450
-      },
-      scale: {
-        start: 0.5,
-        end: 0
-      },
-      gravityY: 600,
-      frequency: 1000 / 30,
-      blendMode: "ADD",
-      tint: {
-        start: 16737280,
-        end: 16711680
-      },
-      alpha: {
-        start: 1,
-        end: 0
-      }
-    });
-    this._flyParticleEmitter.stop();
-    this._flyParticleEmitter.setDepth(9);
-    this._gameLayer.container.add(this._flyParticleEmitter);
-    this._flyParticle2Emitter = scene.add.particles(0, 0, "GJ_WebSheet", {
-      frame: "square.png",
-      speed: {
-        min: 220,
-        max: 380
-      },
-      angle: {
-        min: 180,
-        max: 360
-      },
-      lifespan: {
-        min: 150,
-        max: 450
-      },
-      scale: {
-        start: 0.75,
-        end: 0
-      },
-      gravityY: 600,
-      frequency: 1000 / 30,
-      blendMode: "ADD",
-      tint: {
-        start: 16760320,
-        end: 16711680
-      },
-      alpha: {
-        start: 1,
-        end: 0
-      }
-    });
-    this._flyParticle2Emitter.stop();
-    this._flyParticle2Emitter.setDepth(9);
-    this._gameLayer.container.add(this._flyParticle2Emitter);
-    this._shipDragEmitter = scene.add.particles(0, 0, "GJ_WebSheet", {
-      frame: "square.png",
-      x: {
-        min: -18,
-        max: 18
-      },
-      speed: {
-        min: 223.79999999999998,
-        max: 343.79999999999995
-      },
-      angle: {
-        min: 205,
-        max: 295
-      },
-      lifespan: {
-        min: 80,
-        max: 220
-      },
-      scale: {
-        start: 0.375,
-        end: 0
-      },
-      gravityX: -700,
-      gravityY: 600,
-      frequency: 25,
-      blendMode: "ADD",
-      alpha: {
-        start: 1,
-        end: 0
-      }
-    });
-    this._shipDragEmitter.stop();
-    this._shipDragEmitter.setDepth(22);
-    this._shipDragActive = false;
-    this._particleActive = false;
-    this._flyParticle2Active = false;
-    this._flyParticleActive = false;
-    const landBurstConfig = {
-      frame: "square.png",
-      speed: {
-        min: 250,
-        max: 350
-      },
-      angle: {
-        min: 210,
-        max: 330
-      },
-      lifespan: {
-        min: 50,
-        max: 600
-      },
-      scale: {
-        start: 0.625,
-        end: 0
-      },
-      gravityY: 1000,
-      blendMode: "ADD",
-      alpha: {
-        start: 1,
-        end: 0
-      },
-      tint: tintLimeGreen,
-      emitting: false
-    };
-    this._landEmitter1 = scene.add.particles(0, 0, "GJ_WebSheet", {
-      ...landBurstConfig
-    });
-    this._landEmitter2 = scene.add.particles(0, 0, "GJ_WebSheet", {
-      ...landBurstConfig
-    });
-    this._aboveContainer = scene.add.container(0, 0);
-    this._aboveContainer.setDepth(13);
-    this._aboveContainer.add(this._landEmitter1);
-    this._aboveContainer.add(this._landEmitter2);
-    this._landIdx = false;
-    this._streak = new ShipTrailRibbon(this._scene, "streak_01", 0.231, 10, 8, 100, tintWhite, 0.7);
-    this._streak.addToContainer(this._gameLayer.container, 8);
-  }
-
-  /*/////////////////////// drag div insert ///////////////////////////////////*/
-  detachOwnedFromLevelContainer() {
-    const c = this._gameLayer.container;
-    if (!c) {
-      return;
-    }
-    const pull = go => {
-      if (go && go.parentContainer === c) {
-        c.remove(go, false);
-      }
-    };
-    pull(this._particleEmitter);
-    pull(this._flyParticleEmitter);
-    pull(this._flyParticle2Emitter);
-    if (this._streak && this._streak._gfx) {
-      pull(this._streak._gfx);
-    }
-  }
-  reattachOwnedToLevelContainer() {
-    const c = this._gameLayer.container;
-    if (!c) {
-      return;
-    }
-    c.add(this._particleEmitter);
-    c.add(this._flyParticleEmitter);
-    c.add(this._flyParticle2Emitter);
-    if (this._streak && this._streak._gfx) {
-      c.add(this._streak._gfx);
-      this._streak._gfx.setDepth(8);
-    }
-  }
-  /*/////////////////////// drag div insert ///////////////////////////////////*/
-  
-  _updateParticles(_cameraX, cameraYOffset, deltaSec) {
-    if (this.p.isDead) {
-      return;
-    }
-    const playerWorldX = this._scene._playerWorldX;
-    const bodyWorldY = gameYToWorldY(this.p.y);
-    this._particleEmitter.particleX = playerWorldX - 20;
-    this._particleEmitter.particleY = bodyWorldY + 26;
-    const runParticlesOn = this.p.onGround && !this.p.isFlying;
-    if (runParticlesOn && !this._particleActive) {
-      this._particleEmitter.start();
-      this._particleActive = true;
-    } else if (!runParticlesOn && this._particleActive) {
-      this._particleEmitter.stop();
-      this._particleActive = false;
-    }
-    {
-      const cr = Math.cos(this._rotation);
-      const sr = Math.sin(this._rotation);
-      const backDist = -24;
-      const sideDist = 18;
-      const fx = playerWorldX + backDist * cr - sideDist * sr;
-      const fy = bodyWorldY + backDist * sr + sideDist * cr;
-      const jitter = (Math.random() * 2 - 1) * 2 * 2;
-      this._flyParticleEmitter.particleX = fx;
-      this._flyParticleEmitter.particleY = fy + jitter;
-      this._flyParticle2Emitter.particleX = fx;
-      this._flyParticle2Emitter.particleY = fy + jitter;
-      this._streak.setPosition(fx + 8, fy);
-    }
-    this._streak.update(deltaSec);
-    const flying = this.p.isFlying;
-    if (flying && !this._flyParticleActive) {
-      this._flyParticleEmitter.start();
-      this._flyParticleActive = true;
-    } else if (!flying && this._flyParticleActive) {
-      this._flyParticleEmitter.stop();
-      this._flyParticleActive = false;
-    }
-    const thrusting = this.p.isFlying && this.p.upKeyDown;
-    if (thrusting && !this._flyParticle2Active) {
-      this._flyParticle2Emitter.start();
-      this._flyParticle2Active = true;
-    } else if (!thrusting && this._flyParticle2Active) {
-      this._flyParticle2Emitter.stop();
-      this._flyParticle2Active = false;
-    }
-    this._shipDragEmitter.x = viewportHalfMinus150;
-    this._shipDragEmitter.particleY = gameYToWorldY(this.p.y) + cameraYOffset + 30;
-    const shipGroundDrag = this.p.isFlying && this.p.onGround && !this.p.onCeiling;
-    if (shipGroundDrag && !this._shipDragActive) {
-      this._shipDragEmitter.start();
-      this._shipDragActive = true;
-    } else if (!shipGroundDrag && this._shipDragActive) {
-      this._shipDragEmitter.stop();
-      this._shipDragActive = false;
-    }
-  }
-  setCubeVisible(visible) {
-    this._playerSpriteLayer.sprite.setVisible(visible);
-    if (this._playerGlowLayer) {
-      this._playerGlowLayer.sprite.setVisible(visible && this._playerGlowLayer.sprite._glowEnabled);
-    }
-    if (this._playerOverlayLayer) {
-      this._playerOverlayLayer.sprite.setVisible(visible);
-    }
-    if (this._playerExtraLayer) {
-      this._playerExtraLayer.sprite.setVisible(visible);
-    }
-  }
-  setShipVisible(visible) {
-    this._shipSpriteLayer.sprite.setVisible(visible);
-    if (this._shipGlowLayer) {
-      this._shipGlowLayer.sprite.setVisible(visible && this._shipGlowLayer.sprite._glowEnabled);
-    }
-    if (this._shipOverlayLayer) {
-      this._shipOverlayLayer.sprite.setVisible(visible);
-    }
-    if (this._shipExtraLayer) {
-      this._shipExtraLayer.sprite.setVisible(visible);
-    }
-  }
-  syncSprites(cameraX, cameraYOffset, deltaSec, screenXOverride) {
-    if (this._endAnimating) {
-      return;
-    }
-    const screenX = screenXOverride !== undefined ? screenXOverride : viewportHalfMinus150;
-    const bodyY = gameYToWorldY(this.p.y) + cameraYOffset;
-    const rot = this._rotation;
-    this._lastCameraX = cameraX;
-    this._lastCameraY = cameraYOffset;
-    this._aboveContainer.x = -cameraX;
-    this._aboveContainer.y = cameraYOffset;
-    if (this.p.isFlying) {
-      const shipOffset = 10;
-      const cr = Math.cos(rot);
-      const sr = Math.sin(rot);
-      const shipOx = -shipOffset * sr;
-      const shipOy = shipOffset * cr;
-      const cubeOx = shipOffset * sr;
-      const cubeOy = -shipOffset * cr;
-      for (const layer of this._shipLayers) {
-        if (layer) {
-          layer.sprite.x = screenX + shipOx;
-          layer.sprite.y = bodyY + shipOy;
-          layer.sprite.rotation = rot;
-        }
-      }
-      for (const layer of this._playerLayers) {
-        if (layer) {
-          layer.sprite.x = screenX + cubeOx;
-          layer.sprite.y = bodyY + cubeOy;
-          layer.sprite.rotation = rot;
-        }
-      }
-    } else {
-      for (const layer of this._allLayers) {
-        if (layer) {
-          layer.sprite.x = screenX;
-          layer.sprite.y = bodyY;
-          layer.sprite.rotation = rot;
-        }
-      }
-    }
-    this._updateParticles(cameraX, cameraYOffset, deltaSec);
-  }
-  enterShipMode(portalRect = null) {
-    if (this.p.isFlying) {
-      return;
-    }
-    this.p.isFlying = true;
-    this._scene.toggleGlitter(true);
-    this.p.yVelocity *= 0.5;
-    this.p.onGround = false;
-    this.p.canJump = false;
-    this.p.isJumping = false;
-    this.stopRotation();
-    this._rotation = 0;
-    this._particleEmitter.stop();
-    this._flyParticle2Active = false;
-    this._streak.reset();
-    this._streak.start();
-    this.setShipVisible(true);
-    for (const layer of this._playerLayers) {
-      if (layer) {
-        layer.sprite.setScale(0.55);
-      }
-    }
-    let flyAnchorY = this.p.y;
-    if (portalRect) {
-      flyAnchorY = portalRect.portalY !== undefined ? portalRect.portalY : portalRect.y;
-    }
-    this._gameLayer.setFlyMode(true, flyAnchorY);
-  }
-  exitShipMode() {
-    if (this.p.isFlying) {
-      this.p.isFlying = false;
-      this._scene.toggleGlitter(false);
-      this.p.yVelocity *= 0.5;
-      this.p.onGround = false;
-      this.p.canJump = false;
-      this.p.isJumping = false;
-      this.stopRotation();
-      this._rotation = 0;
-      this._flyParticleEmitter.stop();
-      this._flyParticleActive = false;
-      this._flyParticle2Emitter.stop();
-      this._flyParticle2Active = false;
-      this._shipDragEmitter.stop();
-      this._shipDragActive = false;
-      this._particleActive = false;
-      this._streak.stop();
-      this._streak.reset();
-      this.setShipVisible(false);
-      this.setCubeVisible(true);
-      for (const layer of this._playerLayers) {
-        if (layer) {
-          layer.sprite.setScale(1);
-        }
-      }
-      this._gameLayer.setFlyMode(false, 0);
-    }
-  }
-  hitGround() {
-    const wasAirborne = !this.p.onGround;
-    if (!this.p.isFlying) {
-      this.p.lastGroundY = this.p.y;
-    }
-    this.p.yVelocity = 0;
-    this.p.onGround = true;
-    this.p.canJump = true;
-    this.p.isJumping = false;
-    this.stopRotation();
-    if (wasAirborne && !this.p.isFlying) {
-      this._landIdx = !this._landIdx;
-      const emitter = this._landIdx ? this._landEmitter1 : this._landEmitter2;
-      const burstX = this._lastCameraX + viewportHalfMinus150;
-      const burstY = gameYToWorldY(this.p.y) + 30;
-      emitter.explode(10, burstX, burstY);
-    }
-  }
-  killPlayer() {
-    if (this.p.isDead) {
-      return;
-    }
-    this.p.isDead = true;
-    this._scene.toggleGlitter(false);
-    this._particleEmitter.stop();
-    this._particleActive = false;
-    this._flyParticleEmitter.stop();
-    this._flyParticleActive = false;
-    this._flyParticle2Emitter.stop();
-    this._flyParticle2Active = false;
-    this._shipDragEmitter.stop();
-    this._shipDragActive = false;
-    this._streak.stop();
-    this._streak.reset();
-    const scene = this._scene;
-    const deathX = scene._playerWorldX - scene._cameraX;
-    const deathY = gameYToWorldY(this.p.y) + this._lastCameraY;
-    const explosionScale = 0.9;
-    scene.add.particles(deathX, deathY, "GJ_WebSheet", {
-      frame: "square.png",
-      speed: {
-        min: 200,
-        max: 800
-      },
-      angle: {
-        min: 0,
-        max: 360
-      },
-      scale: {
-        start: 18 / 32,
-        end: 0
-      },
-      alpha: {
-        start: 1,
-        end: 0
-      },
-      lifespan: {
-        min: 50,
-        max: 800
-      },
-      quantity: 100,
-      stopAfter: 100,
-      blendMode: blendAdditive,
-      tint: tintLimeGreen,
-      x: {
-        min: -20,
-        max: 20
-      },
-      y: {
-        min: -20,
-        max: 20
-      }
-    }).setScrollFactor(0).setDepth(15);
-    const deathFlash = scene.add.graphics().setScrollFactor(0).setDepth(15).setBlendMode(blendAdditive);
-    const flashTween = {
-      t: 0
-    };
-    scene.tweens.add({
-      targets: flashTween,
-      t: 1,
-      duration: 500,
-      ease: "Quad.Out",
-      onUpdate: () => {
-        const radius = 18 + flashTween.t * 144;
-        const alpha = 1 - flashTween.t;
-        deathFlash.clear();
-        deathFlash.fillStyle(tintLimeGreen, alpha);
-        deathFlash.fillCircle(deathX, deathY, radius);
-      },
-      onComplete: () => deathFlash.destroy()
-    });
-    this._createExplosionPieces(deathX, deathY, explosionScale);
-    this.setCubeVisible(false);
-    this.setShipVisible(false);
-  }
-  _createExplosionPieces(centerX, centerY, scale) {
-    const scene = this._scene;
-    const captureSize = Math.round(scale * 40 * 2);
-    const rt = scene.make.renderTexture({
-      x: 0,
-      y: 0,
-      width: captureSize,
-      height: captureSize,
-      add: false
-    });
-    const spriteLayersForCapture = [this._playerGlowLayer, this._playerOverlayLayer, this._shipGlowLayer, this._shipOverlayLayer, this._playerSpriteLayer, this._playerExtraLayer, this._shipSpriteLayer, this._shipExtraLayer];
-    for (const entry of spriteLayersForCapture) {
-      if (!entry || !entry.sprite.visible) {
-        continue;
-      }
-      const spr = entry.sprite;
-      rt.draw(spr, captureSize / 2 + (spr.x - centerX), captureSize / 2 + (spr.y - centerY));
-    }
-    const texKey = "__deathRT_" + Date.now();
-    rt.saveTexture(texKey);
-    const texture = scene.textures.get(texKey);
-    let cols = 2 + Math.round(Math.random() * 2);
-    let rows = 2 + Math.round(Math.random() * 2);
-    const rarityRoll = Math.random();
-    if (rarityRoll > 0.95) {
-      cols = 1;
-    } else if (rarityRoll > 0.9) {
-      rows = 1;
-    }
-    const pieceVelBase = 7.4779225920000005;
-    const pieceVelMin = pieceVelBase * 0.5;
-    const pieceVelSpread = pieceVelBase * 1;
-    const sliceJitter = 0.45;
-    const colW = captureSize / cols;
-    const rowH = captureSize / rows;
-    const colWidths = [];
-    const rowHeights = [];
-    const colStarts = [0];
-    const rowStarts = [0];
-    let accW = 0;
-    let accH = 0;
-    for (let ci = 0; ci < cols - 1; ci++) {
-      const w = Math.round(colW * (0.55 + Math.random() * sliceJitter * 2));
-      colWidths.push(w);
-      accW += w;
-      colStarts.push(accW);
-    }
-    colWidths.push(captureSize - accW);
-    for (let ri = 0; ri < rows - 1; ri++) {
-      const h = Math.round(rowH * (0.55 + Math.random() * sliceJitter * 2));
-      rowHeights.push(h);
-      accH += h;
-      rowStarts.push(accH);
-    }
-    rowHeights.push(captureSize - accH);
-    this._explosionPieces = [];
-    this._explosionContainer = scene.add.container(centerX, centerY).setDepth(16);
-    let pieceCount = 0;
-    for (let ci = 0; ci < cols; ci++) {
-      const cw = colWidths[ci];
-      const cx0 = colStarts[ci];
-      for (let ri = 0; ri < rows; ri++) {
-        const rh = rowHeights[ri];
-        const ry0 = rowStarts[ri];
-        if (cw <= 0 || rh <= 0) {
-          continue;
-        }
-        pieceCount++;
-        const frameName = "piece_" + ci + "_" + ri;
-        texture.add(frameName, 0, cx0, ry0, cw, rh);
-        const pieceImg = scene.add.image(0, 0, texKey, frameName);
-        pieceImg.x = cx0 + cw / 2 - captureSize / 2;
-        pieceImg.y = -(ry0 + rh / 2 - captureSize / 2);
-        this._explosionContainer.add(pieceImg);
-        let trail = null;
-        if (pieceCount % 2 == 0) {
-          const life = 200 + Math.random() * 200;
-          const imgRef = pieceImg;
-          trail = scene.add.particles(0, 0, "GJ_WebSheet", {
-            frame: "square.png",
-            speed: 0,
-            scale: {
-              start: 0.5,
-              end: 0
-            },
-            alpha: {
-              start: 1,
-              end: 0
-            },
-            lifespan: life,
-            frequency: 25,
-            quantity: 1,
-            emitting: true,
-            blendMode: blendAdditive,
-            tint: tintLimeGreen,
-            emitCallback: particle => {
-              particle.x = imgRef.x + (Math.random() * 2 - 1) * 3 * 2;
-              particle.y = imgRef.y + (Math.random() * 2 - 1) * 3 * 2;
-            }
-          });
-          this._explosionContainer.addAt(trail, 0);
-        }
-        const piece = {
-          spr: pieceImg,
-          particle: trail,
-          xVel: pieceVelMin + (Math.random() * 2 - 1) * pieceVelSpread,
-          yVel: -(12 + (Math.random() * 2 - 1) * 6),
-          timer: 1.4,
-          fadeTime: 0.5,
-          rotDelta: (Math.random() * 2 - 1) * 360 / 60,
-          halfSize: Math.min(cw, rh) / 2
-        };
-        this._explosionPieces.push(piece);
-      }
-    }
-    this._explosionGroundSY = gameYToWorldY(0) + this._lastCameraY;
-    this._explosionRT = rt;
-    this._explosionTexKey = texKey;
-  }
-  clearExplosionDebrisOnly() {
-    this._cleanupExplosion();
-  }
-  updateExplosionPieces(deltaMs) {
-    if (!this._explosionPieces || this._explosionPieces.length === 0) {
-      return;
-    }
-    const dt = deltaMs / 1000;
-    const timeScaled = Math.min(dt * 60 * 0.9, 2);
-    const gravityStep = timeScaled * 0.5 * 2;
-    const groundLocalY = this._explosionGroundSY - this._explosionContainer.y;
-    let i = 0;
-    while (i < this._explosionPieces.length) {
-      const piece = this._explosionPieces[i];
-      piece.timer -= dt;
-      if (piece.timer > 0) {
-        piece.yVel += gravityStep;
-        piece.xVel *= 0.98 + (1 - timeScaled) * 0.02;
-        let nx = piece.spr.x + piece.xVel * timeScaled;
-        let ny = piece.spr.y + piece.yVel * timeScaled;
-        const floorY = groundLocalY - piece.halfSize;
-        if (ny > floorY && piece.yVel > 0) {
-          ny = floorY;
-          piece.yVel *= -0.8;
-          if (Math.abs(piece.yVel) < 3) {
-            piece.yVel = -3;
-          }
-        }
-        piece.spr.x = nx;
-        piece.spr.y = ny;
-        piece.spr.angle += piece.rotDelta * timeScaled;
-        if (piece.timer < piece.fadeTime) {
-          const fadeA = piece.timer / piece.fadeTime;
-          piece.spr.setAlpha(fadeA);
-          if (piece.particle) {
-            piece.particle.setAlpha(fadeA);
-          }
-        }
-        i++;
-      } else {
-        if (piece.particle) {
-          piece.particle.stop();
-          piece.particle.destroy();
-        }
-        piece.spr.destroy();
-        this._explosionPieces.splice(i, 1);
-      }
-    }
-    if (this._explosionPieces.length === 0) {
-      this._cleanupExplosion();
-    }
-  }
-  _cleanupExplosion() {
-    if (this._explosionPieces) {
-      for (const piece of this._explosionPieces) {
-        if (piece.particle) {
-          piece.particle.stop();
-          piece.particle.destroy();
-        }
-        if (piece.spr) {
-          piece.spr.destroy();
-        }
-      }
-    }
-    if (this._explosionContainer) {
-      this._explosionContainer.destroy();
-      this._explosionContainer = null;
-    }
-    if (this._explosionTexKey) {
-      this._scene.textures.remove(this._explosionTexKey);
-      this._explosionTexKey = null;
-    }
-    if (this._explosionRT) {
-      this._explosionRT.destroy();
-      this._explosionRT = null;
-    }
-    this._explosionPieces = null;
-  }
-  _playPortalShine(portalRect) {
-    const scene = this._scene;
-    const px = portalRect.x;
-    const py = gameYToWorldY(portalRect.portalY);
-    const shineFrames = ["portalshine_02_front_001.png", "portalshine_02_back_001.png"];
-    const targetContainers = [this._gameLayer.topContainer, this._gameLayer.container];
-    for (let li = 0; li < 2; li++) {
-      const resolved = resolveAtlasFrame(scene, shineFrames[li]);
-      if (!resolved) {
-        continue;
-      }
-      const img = scene.add.image(px, py, resolved.atlas, resolved.frame);
-      img.setBlendMode(blendAdditive);
-      img.setAlpha(0);
-      targetContainers[li].add(img);
-      scene.tweens.add({
-        targets: img,
-        alpha: {
-          from: 0,
-          to: 1
-        },
-        duration: 50,
-        onComplete: () => {
-          scene.tweens.add({
-            targets: img,
-            alpha: 0,
-            duration: 400,
-            onComplete: () => img.destroy()
-          });
-        }
-      });
-    }
-  }
-  _checkSnapJump(landRect) {
-    const snapOffsets = [{
-      dx: 240,
-      dy: 60
-    }, {
-      dx: 300,
-      dy: -60
-    }, {
-      dx: 180,
-      dy: 120
-    }];
-    const prev = this._lastLandObject;
-    if (prev && prev !== landRect && prev.type === collisionSolid) {
-      const px = prev.x;
-      const py = prev.y;
-      const nx = landRect.x;
-      const ny = landRect.y;
-      const gy = this.p.gravityFlipped ? -1 : 1;
-      let matched = false;
-      for (const off of snapOffsets) {
-        if (Math.abs(nx - (px + off.dx)) <= 2 && Math.abs(ny - (py + off.dy * gy)) <= 2) {
-          matched = true;
-          break;
-        }
-      }
-      if (matched) {
-        const targetX = landRect.x + this._lastXOffset;
-        const curX = this._scene._playerWorldX;
-        const snapped = Math.abs(targetX - curX) <= 2 ? targetX : targetX > curX ? curX + 2 : curX - 2;
-        this._scene._playerWorldX = snapped;
-      }
-    }
-    this._lastLandObject = landRect;
-    this._lastXOffset = this._scene._playerWorldX - landRect.x;
-  }
-  _isFallingPastThreshold() {
-    if (this.p.gravityFlipped) {
-      return this.p.yVelocity > 0.25;
-    } else {
-      return this.p.yVelocity < -0.25;
-    }
-  }
-  flipMod() {
-    if (this.p.gravityFlipped) {
-      return -1;
-    } else {
-      return 1;
-    }
-  }
-  runRotateAction() {
-    this.rotateActionActive = true;
-    this.rotateActionTime = 0;
-    this.rotateActionDuration = 0.39 / inputSmoothingMul;
-    this.rotateActionStart = this._rotation;
-    this.rotateActionTotal = Math.PI * this.flipMod();
-  }
-  stopRotation() {
-    this.rotateActionActive = false;
-  }
-  updateRotateAction(deltaSec) {
-    if (!this.rotateActionActive) {
-      return;
-    }
-    this.rotateActionTime += deltaSec;
-    if (this.rotateActionTime >= this.rotateActionDuration) {
-      this.rotateActionActive = false;
-    }
-    let t = Math.min(this.rotateActionTime / this.rotateActionDuration, 1);
-    this._rotation = this.rotateActionStart + this.rotateActionTotal * t;
-  }
-  convertToClosestRotation() {
-    const quarterTurn = Math.PI / 2;
-    return Math.round(this._rotation / quarterTurn) * quarterTurn;
-  }
-  slerp2D(fromAngle, toAngle, t) {
-    let diff = toAngle - fromAngle;
-    while (diff > Math.PI) {
-      diff -= Math.PI * 2;
-    }
-    while (diff < -Math.PI) {
-      diff += Math.PI * 2;
-    }
-    return fromAngle + diff * t;
-  }
-  updateGroundRotation(deltaSec) {
-    let target = this.convertToClosestRotation();
-    const smooth = 0.47250000000000003;
-    let step = Math.min(deltaSec * 1, smooth * deltaSec);
-    this._rotation = this.slerp2D(this._rotation, target, step);
-  }
-  updateShipRotation(deltaSec) {
-    let dy = -(this.p.y - this.p.lastY);
-    let dx = deltaSec * 10.3860036;
-    if (dx * dx + dy * dy >= deltaSec * 0.6) {
-      let targetAngle = Math.atan2(dy, dx);
-      const smooth = 0.15;
-      let step = Math.min(deltaSec * 1, smooth * deltaSec);
-      this._rotation = this.slerp2D(this._rotation, targetAngle, step);
-    }
-  }
-  playerIsFalling() {
-    if (this.p.gravityFlipped) {
-      return this.p.yVelocity > 3.832796;
-    } else {
-      return this.p.yVelocity < 3.832796;
-    }
-  }
-  updateJump(deltaSec) {
-    if (this.p.isFlying) {
-      this._updateFlyJump(deltaSec);
-    } else if (this.p.upKeyDown && this.p.canJump) {
-      this.p.isJumping = true;
-      this.p.onGround = false;
-      this.p.canJump = false;
-      this.p.upKeyPressed = false;
-      this.p.yVelocity = this.flipMod() * 22.360064;
-      this.runRotateAction();
-    } else if (this.p.isJumping) {
-      this.p.yVelocity -= gravityMul * deltaSec * this.flipMod();
-      if (this.playerIsFalling()) {
-        this.p.isJumping = false;
-        this.p.onGround = false;
-      }
-    } else {
-      if (this.playerIsFalling()) {
-        this.p.canJump = false;
-      }
-      this.p.yVelocity -= gravityMul * deltaSec * this.flipMod();
-      if (this.p.gravityFlipped) {
-        this.p.yVelocity = Math.min(this.p.yVelocity, 30);
-      } else {
-        this.p.yVelocity = Math.max(this.p.yVelocity, -30);
-      }
-      if (this._isFallingPastThreshold() && !this.rotateActionActive) {
-        this.runRotateAction();
-      }
-      if (this.playerIsFalling()) {
-        const fastFall = this.p.gravityFlipped ? this.p.yVelocity > 4 : this.p.yVelocity < -4;
-        if (fastFall) {
-          this.p.onGround = false;
-        }
-      }
-    }
-  }
-  _updateFlyJump(deltaSec) {
-    let liftMul = 0.8;
-    if (this.p.upKeyDown && !this.p.wasBoosted) {
-      liftMul = -1;
-    }
-    if (!this.p.upKeyDown && !this.playerIsFalling()) {
-      liftMul = 1.2;
-    }
-    let gravMul = 0.4;
-    if (this.p.upKeyDown && this.playerIsFalling()) {
-      gravMul = 0.5;
-    }
-    this.p.yVelocity -= gravityMul * deltaSec * this.flipMod() * liftMul * gravMul;
-    if (this.p.upKeyDown) {
-      this.p.onGround = false;
-    }
-    if (!this.p.wasBoosted) {
-      if (this.p.gravityFlipped) {
-        this.p.yVelocity = Math.max(this.p.yVelocity, -16);
-        this.p.yVelocity = Math.min(this.p.yVelocity, 12.8);
-      } else {
-        this.p.yVelocity = Math.max(this.p.yVelocity, -12.8);
-        this.p.yVelocity = Math.min(this.p.yVelocity, 16);
-      }
-    }
-  }
-  checkCollisions(cameraX) {
-    const halfW = 30;
-    const playerX = cameraX + viewportHalfMinus150;
-    const py = this.p.y;
-    const lastY = this.p.lastY;
-    const hitInset = this.p.isFlying ? 12 : 20;
-    this.p.collideTop = 0;
-    this.p.collideBottom = 0;
-    this.p.onCeiling = false;
-    let landedOnSolid = false;
-    const nearby = this._gameLayer.getNearbySectionObjects(playerX);
-    for (let rect of nearby) {
-      let left = rect.x - rect.w / 2;
-      let right = rect.x + rect.w / 2;
-      let top = rect.y - rect.h / 2;
-      let bottom = rect.y + rect.h / 2;
-      if (!(playerX + 30 <= left) && !(playerX - 30 >= right) && !(py + halfW <= top) && !(py - halfW >= bottom)) {
-        if (rect.type !== objectTypeFlyMode) {
-          if (rect.type !== objectTypeCubeMode) {
-            if (rect.type === collisionHazard) {
-              this.killPlayer();
-              return;
-            }
-            if (rect.type === collisionSolid) {
-              let feetPrev = py - halfW + hitInset;
-              let feetLast = lastY - halfW + hitInset;
-              let headPrev = py + halfW - hitInset;
-              let headLast = lastY + halfW - hitInset;
-              const crushPad = 9;
-              const crushZone = playerX + crushPad > left && playerX - crushPad < right && py + crushPad > top && py - crushPad < bottom;
-              const onTop = (this.p.yVelocity <= 0 || this.p.onGround) && (feetPrev >= bottom || feetLast >= bottom);
-              if (crushZone && !onTop) {
-                this.killPlayer();
-                return;
-              }
-              if (playerX + 30 - 5 > left && playerX - 30 + 5 < right) {
-                if ((feetPrev >= bottom || feetLast >= bottom) && (this.p.yVelocity <= 0 || this.p.onGround)) {
-                  this.p.y = bottom + halfW;
-                  this.hitGround();
-                  landedOnSolid = true;
-                  this.p.collideBottom = bottom;
-                  if (!this.p.isFlying) {
-                    this._checkSnapJump(rect);
-                  }
-                  continue;
-                }
-                if ((headPrev <= top || headLast <= top) && (this.p.yVelocity >= 0 || this.p.onGround) && this.p.isFlying) {
-                  this.p.y = top - halfW;
-                  this.hitGround();
-                  this.p.onCeiling = true;
-                  this.p.collideTop = top;
-                  continue;
-                }
-              }
-            }
-          } else if (!rect.activated) {
-            rect.activated = true;
-            this._playPortalShine(rect);
-            this.exitShipMode();
-          }
-        } else if (!rect.activated) {
-          rect.activated = true;
-          this._playPortalShine(rect);
-          this.enterShipMode(rect);
-        }
-      }
-    }
-    if (this.p.collideTop !== 0 && this.p.collideBottom !== 0) {
-      if (Math.abs(this.p.collideTop - this.p.collideBottom) < 48) {
-        this.killPlayer();
-        return;
-      }
-    }
-    let floorY = this._gameLayer.getFloorY();
-    if (!landedOnSolid) {
-      if (this.p.y <= floorY + 30) {
-        this.p.y = floorY + 30;
-        this.hitGround();
-      }
-    }
-    let ceilingY = this._gameLayer.getCeilingY();
-    if (ceilingY !== null && this.p.y >= ceilingY - 30) {
-      this.p.y = ceilingY - 30;
-      this.hitGround();
-      this.p.onCeiling = true;
-    }
-    if (this.p.isFlying) {
-      const onFloor = this.p.y <= floorY + 30;
-      const onCeil = ceilingY !== null && this.p.y >= ceilingY - 30;
-      if (!landedOnSolid && !onFloor && this.p.collideTop === 0 && !onCeil) {
-        this.p.onGround = false;
-      }
-    }
-  }
-  drawHitboxes(gfx, cameraX, cameraYOffset) {
-    gfx.clear();
-    if (!this._showHitboxes) {
-      return;
-    }
-    const half = 30;
-    const playerX = cameraX + viewportHalfMinus150;
-    const py = this.p.y;
-    const hitInset = this.p.isFlying ? 12 : 20;
-    const objs = this._gameLayer.getNearbySectionObjects(playerX);
-    for (let rect of objs) {
-      let rx = rect.x - cameraX;
-      let ry = gameYToWorldY(rect.y) + cameraYOffset;
-      let color = 65280;
-      if (rect.type === collisionHazard) {
-        color = 16729156;
-      } else if (rect.type === collisionPortalFly || rect.type === collisionPortalCube) {
-        color = 4491519;
-      }
-      gfx.lineStyle(2, color, 0.7);
-      gfx.strokeRect(rx - rect.w / 2, ry - rect.h / 2, rect.w, rect.h);
-    }
-    const cx = viewportHalfMinus150;
-    const bodyY = gameYToWorldY(py) + cameraYOffset;
-    gfx.lineStyle(2, 65535, 0.8);
-    gfx.strokeRect(cx - half, bodyY - half, gridCellPx, gridCellPx);
-    gfx.lineStyle(2, 16776960, 0.8);
-    gfx.strokeRect(cx - half + 5, bodyY - half, 50, gridCellPx);
-    gfx.lineStyle(2, 16711680, 0.8);
-    gfx.strokeRect(cx - half, bodyY - half + 5, gridCellPx, 50);
-    let topProbeY = gameYToWorldY(py - half + hitInset) + cameraYOffset;
-    let botProbeY = gameYToWorldY(py + half - hitInset) + cameraYOffset;
-    gfx.lineStyle(2, 16746496, 0.9);
-    gfx.lineBetween(cx - half - 8, topProbeY, cx + half + 8, topProbeY);
-    gfx.lineBetween(cx - half - 8, botProbeY, cx + half + 8, botProbeY);
-    gfx.lineStyle(2, 16777215, 1);
-    gfx.strokeRect(cx - 9, bodyY - 9, 36, 18);
-  }
-  setShowHitboxes(on) {
-    this._showHitboxes = on;
-  }
-  playEndAnimation(targetWorldX, onComplete, portalGameY) {
-    this._endAnimating = true;
-    const scene = this._scene;
-    const endY = portalGameY || 240;
-    const startX = scene._playerWorldX;
-    const startY = this.p.y;
-    const destX = targetWorldX + 100;
-    const destY = endY - 40;
-    const startXKeep = startX;
-    const startYKeep = startY;
-    const midX = startX + 80;
-    const midY = endY + 300;
-    const visibleSprites = [this._playerSpriteLayer, this._playerGlowLayer, this._playerOverlayLayer, this._playerExtraLayer, this._shipSpriteLayer, this._shipGlowLayer, this._shipOverlayLayer, this._shipExtraLayer].filter(L => L && L.sprite.visible).map(L => L.sprite);
-    this._particleEmitter.stop();
-    this._flyParticleEmitter.stop();
-    this._flyParticle2Emitter.stop();
-    this._shipDragEmitter.stop();
-    const flying = this.p.isFlying;
-    const shipLayers = [this._shipSpriteLayer, this._shipGlowLayer, this._shipOverlayLayer, this._shipExtraLayer];
-    const cubeLayers = [this._playerSpriteLayer, this._playerGlowLayer, this._playerOverlayLayer, this._playerExtraLayer];
-    const tweenSprites = visibleSprites.map(spr => {
-      let localY = 0;
-      if (flying) {
-        const isShip = shipLayers.some(L => L && L.sprite === spr);
-        const isCube = cubeLayers.some(L => L && L.sprite === spr);
-        if (isShip) {
-          localY = 10;
-        } else if (isCube) {
-          localY = -10;
-        }
-      }
-      return {
-        spr,
-        localY
-      };
-    });
-    const streak = this._streak;
-    const tweenState = {
-      val: 0
-    };
-    scene.tweens.add({
-      targets: tweenState,
-      val: 1,
-      duration: 1000,
-      ease: t => Math.pow(t, 1.2),
-      onUpdate: () => {
-        const u = tweenState.val;
-        const wx = (1 - u) ** 3 * startXKeep + (1 - u) ** 2 * 3 * u * startXKeep + (1 - u) * 3 * u ** 2 * midX + u ** 3 * destX;
-        const wy = (1 - u) ** 3 * startYKeep + (1 - u) ** 2 * 3 * u * startYKeep + (1 - u) * 3 * u ** 2 * midY + u ** 3 * destY;
-        const screenX = wx - scene._cameraX;
-        const screenY = gameYToWorldY(wy) + scene._cameraY;
-        const alpha = 1 - u * u;
-        const baseRot = tweenSprites[0].spr.rotation;
-        const cr = Math.cos(baseRot);
-        const sr = Math.sin(baseRot);
-        for (const entry of tweenSprites) {
-          const ox = -entry.localY * sr;
-          const oy = entry.localY * cr;
-          entry.spr.setPosition(screenX + ox, screenY + oy);
-          entry.spr.setAlpha(alpha);
-        }
-        streak.setPosition(wx, gameYToWorldY(wy));
-        streak.update(scene.game.loop.delta / 1000);
-      },
-      onComplete: () => {
-        for (const entry of tweenSprites) {
-          entry.spr.setVisible(false);
-        }
-        streak.stop();
-        streak.reset();
-        onComplete();
-      }
-    });
-    for (const spr of visibleSprites) {
-      scene.tweens.add({
-        targets: spr,
-        angle: spr.angle + 360,
-        duration: 1000,
-        ease: t => Math.pow(t, 1.5)
-      });
-    }
-  }
-  reset() {
-    this._cleanupExplosion();
-    this._endAnimating = false;
-    this._lastLandObject = null;
-    this._lastXOffset = 0;
-    this.stopRotation();
-    this.rotateActionTime = 0;
-    this._rotation = 0;
-    this._lastCameraX = 0;
-    this._lastCameraY = 0;
-    this.setCubeVisible(true);
-    this.setShipVisible(false);
-    for (const layer of this._allLayers) {
-      if (layer) {
-        layer.sprite.setAlpha(1);
-      }
-    }
-    for (const layer of this._playerLayers) {
-      if (layer) {
-        layer.sprite.setScale(1);
-      }
-    }
-    this._particleEmitter.stop();
-    this._particleActive = false;
-    this._flyParticleEmitter.stop();
-    this._flyParticleActive = false;
-    this._flyParticle2Emitter.stop();
-    this._flyParticle2Active = false;
-    this._shipDragEmitter.stop();
-    this._shipDragActive = false;
-    this._streak.stop();
-    this._streak.reset();
-  }
-}
-const COLOR_ID_BACKGROUND = 1000;
-const COLOR_ID_GROUND = 1001;
-
-class RgbColorTween {
-  constructor(fromRgb, toRgb, durationSec) {
-    this.from = {
-      ...fromRgb
-    };
-    this.to = {
-      ...toRgb
-    };
-    this.duration = durationSec;
-    this.elapsed = 0;
-    this.done = durationSec <= 0;
-    this.current = durationSec <= 0 ? {
-      ...toRgb
-    } : {
-      ...fromRgb
-    };
-  }
-  step(deltaSec) {
-    if (this.done) {
-      return;
-    }
-    this.elapsed += deltaSec;
-    let t = this.duration > 0 ? Math.min(this.elapsed / this.duration, 1) : 1;
-    if (t >= 1) {
-      this.current = {
-        ...this.to
-      };
-      this.done = true;
-    } else {
-      this.current = {
-        r: Math.round(this.from.r + (this.to.r - this.from.r) * t),
-        g: Math.round(this.from.g + (this.to.g - this.from.g) * t),
-        b: Math.round(this.from.b + (this.to.b - this.from.b) * t)
-      };
-    }
-  }
-}
-// rgb tweens for level palette slots (COLOR_ID_BACKGROUND / COLOR_ID_GROUND from color triggers)
-class ColorManager {
-  constructor() {
-    this.reset();
-  }
-  reset() {
-    this._colors = {
-      [COLOR_ID_BACKGROUND]: {
-        r: 0,
-        g: 102,
-        b: 255
-      },
-      [COLOR_ID_GROUND]: {
-        r: 0,
-        g: 68,
-        b: 170
-      }
-    };
-    this._actions = {};
-  }
-  triggerColor(colorId, targetColor, duration) {
-    let fromRgb = {
-      ...this.getColor(colorId)
-    };
-    this._actions[colorId] = new RgbColorTween(fromRgb, targetColor, duration);
-    if (duration <= 0) {
-      this._colors[colorId] = {
-        ...targetColor
-      };
-    }
-  }
-  step(deltaSeconds) {
-    for (let colorId in this._actions) {
-      let tween = this._actions[colorId];
-      tween.step(deltaSeconds);
-      this._colors[colorId] = {
-        ...tween.current
-      };
-      if (tween.done) {
-        delete this._actions[colorId];
-      }
-    }
-  }
-  getColor(colorId) {
-    return this._colors[colorId] || {
-      r: 255,
-      g: 255,
-      b: 255
-    };
-  }
-  getHex(colorId) {
-    let rgb = this.getColor(colorId);
-    return rgb.r << 16 | rgb.g << 8 | rgb.b;
-  }
-}
-// audio, so music and sfx. getMeteringValue() feeds rod/orb pulse scaling
-class AudioManager {
-  constructor(scene) {
-    this._scene = scene;
-    this._music = null;
-    this._userMusicVol = scene.game.registry.get("userMusicVol") ?? 1;
-    this._meteringEnabled = false;
-    this._analyser = null;
-    this._meterBuffer = null;
-    this._meterValue = 0.1;
-    this._lastAudio = 0.1;
-    this._lastPeak = 0;
-    this._silenceCounter = 0;
-  }
-  _effectiveVolume() {
-    return this._userMusicVol * 0.8;
-  }
-  startMusic() {
-    if (this._music) {
-      this._music.stop();
-      this._music.destroy();
-    }
-    this._music = this._scene.sound.add("stereo_madness", {
-      loop: true,
-      volume: this._effectiveVolume()
-    });
-    this._music.play();
-    this._setupAnalyser();
-  }
-  stopMusic() {
-    if (this._music) {
-      this._music.stop();
-    }
-  }
-  pauseMusic() {
-    if (this._music && this._music.isPlaying) {
-      this._music.pause();
-    }
-  }
-  resumeMusic() {
-    if (this._music && this._music.isPaused) {
-      this._music.resume();
-    }
-  }
-  getUserMusicVolume() {
-    return this._userMusicVol;
-  }
-  setUserMusicVolume(volume) {
-    this._userMusicVol = volume;
-    this._scene.game.registry.set("userMusicVol", volume);
-    if (this._music) {
-      this._music.volume = this._effectiveVolume();
-    }
-  }
-  getMusicVolume() {
-    return this._effectiveVolume();
-  }
-  setMusicVolume(volume) {
-    this.setUserMusicVolume(volume / 0.8);
-  }
-  fadeInMusic(durationMs = 1000) {
-    if (this._music) {
-      this._music.stop();
-      this._music.destroy();
-    }
-    this._music = this._scene.sound.add("stereo_madness", {
-      loop: true,
-      volume: 0
-    });
-    this._music.play();
-    this._setupAnalyser();
-    this._scene.tweens.add({
-      targets: this._music,
-      volume: this._effectiveVolume(),
-      duration: durationMs
-    });
-  }
-  fadeOutMusic(durationMs = 1500) {
-    if (this._music && this._music.isPlaying) {
-      this._music.setLoop(false);
-      this._scene.tweens.add({
-        targets: this._music,
-        volume: 0,
-        duration: durationMs,
-        onComplete: () => {
-          if (this._music) {
-            this._music.stop();
-          }
-        }
-      });
-    }
-  }
-  playEffect(soundKey, config = {}) {
-    const sfxSceneMul = this._scene._sfxVolume !== undefined ? this._scene._sfxVolume : 1;
-    config.volume = (config.volume || 1) * sfxSceneMul;
-    this._scene.sound.play(soundKey, config);
-  }
-  _setupAnalyser() {
-    const audioCtx = this._scene.sound.context;
-    if (audioCtx) {
-      this._analyser = audioCtx.createAnalyser();
-      this._analyser.fftSize = 2048;
-      this._meterBuffer = new Float32Array(this._analyser.fftSize);
-      this._scene.sound.masterVolumeNode.connect(this._analyser);
-      this._meteringEnabled = true;
-    }
-  }
-  update(deltaSeconds) {
-    if (!this._meteringEnabled || !this._analyser) {
-      return;
-    }
-    this._analyser.getFloatTimeDomainData(this._meterBuffer);
-    let peakAbs = 0;
-    for (let si = 0; si < this._meterBuffer.length; si++) {
-      let sampleAbs = Math.abs(this._meterBuffer[si]);
-      if (sampleAbs > peakAbs) {
-        peakAbs = sampleAbs;
-      }
-    }
-    const musicVolNorm = this._effectiveVolume();
-    if (musicVolNorm > 0) {
-      peakAbs /= musicVolNorm;
-    }
-    this._meterValue = 0.1 + peakAbs;
-    const dtScaled = deltaSeconds * 60;
-    if (this._silenceCounter < 3 || this._meterValue < this._lastAudio * 1.1 || this._meterValue < this._lastPeak * 0.95 && this._lastAudio > this._lastPeak * 0.2) {
-      this._meterValue = this._lastAudio * Math.pow(0.92, dtScaled);
-    } else {
-      this._silenceCounter = 0;
-      this._lastPeak = this._meterValue;
-      this._meterValue *= Math.pow(1.46, dtScaled);
-    }
-    if (this._meterValue <= 0.1) {
-      this._lastPeak = 0;
-    }
-    this._lastAudio = this._meterValue;
-    this._silenceCounter++;
-  }
-  getMeteringValue() {
-    return this._meterValue;
-  }
-  reset() {
-    this._meterValue = 0.1;
-    this._lastAudio = 0.1;
-    this._lastPeak = 0;
-    this._silenceCounter = 0;
-    this.stopMusic();
-  }
-}
-const PauseKind = {
-  REPLAY: "pauseReplay",
-  RESUME: "pauseResume",
-  MENU: "pauseMenu"
-};
-const EndKind = {
-  REPLAY: "endReplay",
-  MENU: "endMenu"
-};
-const GDRegistry = {
-  PauseReturnFadeIn: "pauseReturnFadeIn",
-  FadeInFromBlack: "fadeInFromBlack"
-};
-const SceneFadeMs = {
-  PauseMenuOut: 250,
-  PauseMenuIn: 250,
-  EndMenuOut: 400,
-  EndMenuIn: 400
-};
-
-const CreditsLink = "https://www.youtube.com/watch?v=JhKyKEDxo8Q";
-
-const MenuLinks = [{
-  key: "downloadSteam_001",
-  url: "https://store.steampowered.com/app/322170/Geometry_Dash"
-}, {
-  key: "downloadGoogle_001",
-  url: "https://play.google.com/store/apps/details?id=com.robtopx.geometryjump&hl=en"
-}, {
-  key: "downloadApple_001",
-  url: "https://apps.apple.com/us/app/geometry-dash/id625334537"
-}];
-
-const EndScreenLinks = [{
-  key: "downloadApple_001",
-  url: "https://apps.apple.com/us/app/geometry-dash/id625334537"
-}, {
-  key: "downloadGoogle_001",
-  url: "https://play.google.com/store/apps/details?id=com.robtopx.geometryjump&hl=en"
-}, {
-  key: "downloadSteam_001",
-  url: "https://store.steampowered.com/app/322170/Geometry_Dash"
-}];
-
-const PauseButtons = [{
-  frame: "GJ_replayBtn_001.png",
-  kind: PauseKind.REPLAY
-}, {
-  frame: "GJ_playBtn2_001.png",
-  kind: PauseKind.RESUME
-}, {
-  frame: "GJ_menuBtn_001.png",
-  kind: PauseKind.MENU
-}];
-
-const EndScreenButtons = [{
-  frame: "GJ_replayBtn_001.png",
-  dx: -200,
-  kind: EndKind.REPLAY
-}, {
-  frame: "GJ_menuBtn_001.png",
-  dx: 200,
-  kind: EndKind.MENU
-}];
 class GameScene extends Phaser.Scene {
   constructor() {
     super({
@@ -102428,6 +100586,7 @@ class GameScene extends Phaser.Scene {
       this.game.registry.remove(GDRegistry.FadeInFromBlack);
       this.cameras.main.fadeIn(SceneFadeMs.EndMenuIn, 0, 0, 0);
     }
+    this.game.events.emit("gd:gamescene-ready");
   }
   _pauseRowButtonAction(kind) {
     switch (kind) {
@@ -103847,6 +102006,1797 @@ class GameScene extends Phaser.Scene {
     });
   }
 }
+class CollisionRect {
+  constructor(type, x, y, width, height) {
+    this.type = type;
+    this.x = x;
+    this.y = y;
+    this.w = width;
+    this.h = height;
+    this.activated = false;
+  }
+}
+class PlayerPhysicsState {
+  constructor() {
+    this.reset();
+  }
+  reset() {
+    this.y = 30;
+    this.lastY = 30;
+    this.lastGroundPosY = 30;
+    this.yVelocity = 0;
+    this.onGround = true;
+    this.canJump = true;
+    this.isJumping = false;
+    this.gravityFlipped = false;
+    this.isFlying = false;
+    this.wasBoosted = false;
+    this.collideTop = 0;
+    this.collideBottom = 0;
+    this.onCeiling = false;
+    this.upKeyDown = false;
+    this.upKeyPressed = false;
+    this.isDead = false;
+  }
+}
+class Player {
+  constructor(scene, physicsState, gameLayer) {
+    this._scene = scene;
+    this.p = physicsState;
+    this._gameLayer = gameLayer;
+    this._rotation = 0;
+    this.rotateActionActive = false;
+    this.rotateActionTime = 0;
+    this.rotateActionDuration = 0;
+    this.rotateActionStart = 0;
+    this.rotateActionTotal = 0;
+    this._showHitboxes = false;
+    this._lastLandObject = null;
+    this._lastXOffset = 0;
+    this._lastCameraX = 0;
+    this._lastCameraY = 0;
+    this._createSprites();
+    this._initParticles(scene);
+    scene.events.on("shutdown", () => this._cleanupExplosion());
+  }
+  _createSprites() {
+    const scene = this._scene;
+    const worldY = gameYToWorldY(this.p.y);
+    const cx = viewportHalfMinus150;
+    this._playerGlowLayer = addDepthSpriteFromAtlas(scene, cx, worldY, "player_01_glow_001.png", 9, false);
+    this._playerSpriteLayer = addDepthSpriteFromAtlas(scene, cx, worldY, "player_01_001.png", 10, true);
+    this._playerOverlayLayer = addDepthSpriteFromAtlas(scene, cx, worldY, "player_01_2_001.png", 8, true);
+    this._playerExtraLayer = addDepthSpriteFromAtlas(scene, cx, worldY, "player_01_extra_001.png", 12, true);
+    if (this._playerGlowLayer) {
+      this._playerGlowLayer.sprite.setTint(tintWhite);
+      this._playerGlowLayer.sprite._glowEnabled = false;
+    }
+    if (this._playerSpriteLayer) {
+      this._playerSpriteLayer.sprite.setTint(tintLimeGreen);
+    } else {
+      let cubeFallback = scene.add.rectangle(cx, worldY, gridCellPx, gridCellPx, tintLimeGreen);
+      cubeFallback.setDepth(10);
+      this._playerSpriteLayer = {
+        sprite: cubeFallback
+      };
+    }
+    if (this._playerOverlayLayer) {
+      this._playerOverlayLayer.sprite.setTint(tintWhite);
+    }
+    this._shipGlowLayer = addDepthSpriteFromAtlas(scene, cx, worldY, "ship_01_glow_001.png", 9, false);
+    this._shipSpriteLayer = addDepthSpriteFromAtlas(scene, cx, worldY, "ship_01_001.png", 10, false);
+    this._shipOverlayLayer = addDepthSpriteFromAtlas(scene, cx, worldY, "ship_01_2_001.png", 8, false);
+    this._shipExtraLayer = addDepthSpriteFromAtlas(scene, cx, worldY, "ship_01_extra_001.png", 12, false);
+    if (this._shipGlowLayer) {
+      this._shipGlowLayer.sprite.setTint(tintWhite);
+      this._shipGlowLayer.sprite._glowEnabled = false;
+    }
+    if (this._shipSpriteLayer) {
+      this._shipSpriteLayer.sprite.setTint(tintLimeGreen);
+    } else {
+      let shipFallback = scene.add.polygon(cx, worldY, [{
+        x: -72,
+        y: 40
+      }, {
+        x: 72,
+        y: 0
+      }, {
+        x: -72,
+        y: -40
+      }, {
+        x: -40,
+        y: 0
+      }], tintLimeGreen);
+      shipFallback.setDepth(10).setVisible(false);
+      this._shipSpriteLayer = {
+        sprite: shipFallback
+      };
+    }
+    if (this._shipOverlayLayer) {
+      this._shipOverlayLayer.sprite.setTint(tintWhite);
+    }
+    this.playerSprite = this._playerSpriteLayer.sprite;
+    this.shipSprite = this._shipSpriteLayer.sprite;
+    this._playerLayers = [this._playerSpriteLayer, this._playerGlowLayer, this._playerOverlayLayer, this._playerExtraLayer];
+    this._shipLayers = [this._shipSpriteLayer, this._shipGlowLayer, this._shipOverlayLayer, this._shipExtraLayer];
+    this._allLayers = [...this._playerLayers, ...this._shipLayers];
+  }
+  _initParticles(scene) {
+    this._particleEmitter = scene.add.particles(0, 0, "GJ_WebSheet", {
+      frame: "square.png",
+      speed: {
+        min: 110,
+        max: 190
+      },
+      angle: {
+        min: 225,
+        max: 315
+      },
+      lifespan: {
+        min: 150,
+        max: 450
+      },
+      scale: {
+        start: 0.5,
+        end: 0
+      },
+      gravityY: 600,
+      frequency: 1000 / 30,
+      blendMode: "ADD",
+      alpha: {
+        start: 1,
+        end: 0
+      },
+      tint: tintLimeGreen
+    });
+    this._particleEmitter.stop();
+    this._particleEmitter.setDepth(9);
+    this._gameLayer.container.add(this._particleEmitter);
+    this._flyParticleEmitter = scene.add.particles(0, 0, "GJ_WebSheet", {
+      frame: "square.png",
+      speed: {
+        min: 22,
+        max: 38
+      },
+      angle: {
+        min: 225,
+        max: 315
+      },
+      lifespan: {
+        min: 150,
+        max: 450
+      },
+      scale: {
+        start: 0.5,
+        end: 0
+      },
+      gravityY: 600,
+      frequency: 1000 / 30,
+      blendMode: "ADD",
+      tint: {
+        start: 16737280,
+        end: 16711680
+      },
+      alpha: {
+        start: 1,
+        end: 0
+      }
+    });
+    this._flyParticleEmitter.stop();
+    this._flyParticleEmitter.setDepth(9);
+    this._gameLayer.container.add(this._flyParticleEmitter);
+    this._flyParticle2Emitter = scene.add.particles(0, 0, "GJ_WebSheet", {
+      frame: "square.png",
+      speed: {
+        min: 220,
+        max: 380
+      },
+      angle: {
+        min: 180,
+        max: 360
+      },
+      lifespan: {
+        min: 150,
+        max: 450
+      },
+      scale: {
+        start: 0.75,
+        end: 0
+      },
+      gravityY: 600,
+      frequency: 1000 / 30,
+      blendMode: "ADD",
+      tint: {
+        start: 16760320,
+        end: 16711680
+      },
+      alpha: {
+        start: 1,
+        end: 0
+      }
+    });
+    this._flyParticle2Emitter.stop();
+    this._flyParticle2Emitter.setDepth(9);
+    this._gameLayer.container.add(this._flyParticle2Emitter);
+    this._shipDragEmitter = scene.add.particles(0, 0, "GJ_WebSheet", {
+      frame: "square.png",
+      x: {
+        min: -18,
+        max: 18
+      },
+      speed: {
+        min: 223.79999999999998,
+        max: 343.79999999999995
+      },
+      angle: {
+        min: 205,
+        max: 295
+      },
+      lifespan: {
+        min: 80,
+        max: 220
+      },
+      scale: {
+        start: 0.375,
+        end: 0
+      },
+      gravityX: -700,
+      gravityY: 600,
+      frequency: 25,
+      blendMode: "ADD",
+      alpha: {
+        start: 1,
+        end: 0
+      }
+    });
+    this._shipDragEmitter.stop();
+    this._shipDragEmitter.setDepth(22);
+    this._shipDragActive = false;
+    this._particleActive = false;
+    this._flyParticle2Active = false;
+    this._flyParticleActive = false;
+    const landBurstConfig = {
+      frame: "square.png",
+      speed: {
+        min: 250,
+        max: 350
+      },
+      angle: {
+        min: 210,
+        max: 330
+      },
+      lifespan: {
+        min: 50,
+        max: 600
+      },
+      scale: {
+        start: 0.625,
+        end: 0
+      },
+      gravityY: 1000,
+      blendMode: "ADD",
+      alpha: {
+        start: 1,
+        end: 0
+      },
+      tint: tintLimeGreen,
+      emitting: false
+    };
+    this._landEmitter1 = scene.add.particles(0, 0, "GJ_WebSheet", {
+      ...landBurstConfig
+    });
+    this._landEmitter2 = scene.add.particles(0, 0, "GJ_WebSheet", {
+      ...landBurstConfig
+    });
+    this._aboveContainer = scene.add.container(0, 0);
+    this._aboveContainer.setDepth(13);
+    this._aboveContainer.add(this._landEmitter1);
+    this._aboveContainer.add(this._landEmitter2);
+    this._landIdx = false;
+    this._streak = new ShipTrailRibbon(this._scene, "streak_01", 0.231, 10, 8, 100, tintWhite, 0.7);
+    this._streak.addToContainer(this._gameLayer.container, 8);
+  }
+
+  /*/////////////////////// drag div insert ///////////////////////////////////*/
+  detachOwnedFromLevelContainer() {
+    const c = this._gameLayer.container;
+    if (!c) {
+      return;
+    }
+    const pull = go => {
+      if (go && go.parentContainer === c) {
+        c.remove(go, false);
+      }
+    };
+    pull(this._particleEmitter);
+    pull(this._flyParticleEmitter);
+    pull(this._flyParticle2Emitter);
+    if (this._streak && this._streak._gfx) {
+      pull(this._streak._gfx);
+    }
+  }
+  reattachOwnedToLevelContainer() {
+    const c = this._gameLayer.container;
+    if (!c) {
+      return;
+    }
+    c.add(this._particleEmitter);
+    c.add(this._flyParticleEmitter);
+    c.add(this._flyParticle2Emitter);
+    if (this._streak && this._streak._gfx) {
+      c.add(this._streak._gfx);
+      this._streak._gfx.setDepth(8);
+    }
+  }
+  /*/////////////////////// drag div insert ///////////////////////////////////*/
+  
+  _updateParticles(_cameraX, cameraYOffset, deltaSec) {
+    if (this.p.isDead) {
+      return;
+    }
+    const playerWorldX = this._scene._playerWorldX;
+    const bodyWorldY = gameYToWorldY(this.p.y);
+    this._particleEmitter.particleX = playerWorldX - 20;
+    this._particleEmitter.particleY = bodyWorldY + 26;
+    const runParticlesOn = this.p.onGround && !this.p.isFlying;
+    if (runParticlesOn && !this._particleActive) {
+      this._particleEmitter.start();
+      this._particleActive = true;
+    } else if (!runParticlesOn && this._particleActive) {
+      this._particleEmitter.stop();
+      this._particleActive = false;
+    }
+    {
+      const cr = Math.cos(this._rotation);
+      const sr = Math.sin(this._rotation);
+      const backDist = -24;
+      const sideDist = 18;
+      const fx = playerWorldX + backDist * cr - sideDist * sr;
+      const fy = bodyWorldY + backDist * sr + sideDist * cr;
+      const jitter = (Math.random() * 2 - 1) * 2 * 2;
+      this._flyParticleEmitter.particleX = fx;
+      this._flyParticleEmitter.particleY = fy + jitter;
+      this._flyParticle2Emitter.particleX = fx;
+      this._flyParticle2Emitter.particleY = fy + jitter;
+      this._streak.setPosition(fx + 8, fy);
+    }
+    this._streak.update(deltaSec);
+    const flying = this.p.isFlying;
+    if (flying && !this._flyParticleActive) {
+      this._flyParticleEmitter.start();
+      this._flyParticleActive = true;
+    } else if (!flying && this._flyParticleActive) {
+      this._flyParticleEmitter.stop();
+      this._flyParticleActive = false;
+    }
+    const thrusting = this.p.isFlying && this.p.upKeyDown;
+    if (thrusting && !this._flyParticle2Active) {
+      this._flyParticle2Emitter.start();
+      this._flyParticle2Active = true;
+    } else if (!thrusting && this._flyParticle2Active) {
+      this._flyParticle2Emitter.stop();
+      this._flyParticle2Active = false;
+    }
+    this._shipDragEmitter.x = viewportHalfMinus150;
+    this._shipDragEmitter.particleY = gameYToWorldY(this.p.y) + cameraYOffset + 30;
+    const shipGroundDrag = this.p.isFlying && this.p.onGround && !this.p.onCeiling;
+    if (shipGroundDrag && !this._shipDragActive) {
+      this._shipDragEmitter.start();
+      this._shipDragActive = true;
+    } else if (!shipGroundDrag && this._shipDragActive) {
+      this._shipDragEmitter.stop();
+      this._shipDragActive = false;
+    }
+  }
+  setCubeVisible(visible) {
+    this._playerSpriteLayer.sprite.setVisible(visible);
+    if (this._playerGlowLayer) {
+      this._playerGlowLayer.sprite.setVisible(visible && this._playerGlowLayer.sprite._glowEnabled);
+    }
+    if (this._playerOverlayLayer) {
+      this._playerOverlayLayer.sprite.setVisible(visible);
+    }
+    if (this._playerExtraLayer) {
+      this._playerExtraLayer.sprite.setVisible(visible);
+    }
+  }
+  setShipVisible(visible) {
+    this._shipSpriteLayer.sprite.setVisible(visible);
+    if (this._shipGlowLayer) {
+      this._shipGlowLayer.sprite.setVisible(visible && this._shipGlowLayer.sprite._glowEnabled);
+    }
+    if (this._shipOverlayLayer) {
+      this._shipOverlayLayer.sprite.setVisible(visible);
+    }
+    if (this._shipExtraLayer) {
+      this._shipExtraLayer.sprite.setVisible(visible);
+    }
+  }
+  syncSprites(cameraX, cameraYOffset, deltaSec, screenXOverride) {
+    if (this._endAnimating) {
+      return;
+    }
+    const screenX = screenXOverride !== undefined ? screenXOverride : viewportHalfMinus150;
+    const bodyY = gameYToWorldY(this.p.y) + cameraYOffset;
+    const rot = this._rotation;
+    this._lastCameraX = cameraX;
+    this._lastCameraY = cameraYOffset;
+    this._aboveContainer.x = -cameraX;
+    this._aboveContainer.y = cameraYOffset;
+    if (this.p.isFlying) {
+      const shipOffset = 10;
+      const cr = Math.cos(rot);
+      const sr = Math.sin(rot);
+      const shipOx = -shipOffset * sr;
+      const shipOy = shipOffset * cr;
+      const cubeOx = shipOffset * sr;
+      const cubeOy = -shipOffset * cr;
+      for (const layer of this._shipLayers) {
+        if (layer) {
+          layer.sprite.x = screenX + shipOx;
+          layer.sprite.y = bodyY + shipOy;
+          layer.sprite.rotation = rot;
+        }
+      }
+      for (const layer of this._playerLayers) {
+        if (layer) {
+          layer.sprite.x = screenX + cubeOx;
+          layer.sprite.y = bodyY + cubeOy;
+          layer.sprite.rotation = rot;
+        }
+      }
+    } else {
+      for (const layer of this._allLayers) {
+        if (layer) {
+          layer.sprite.x = screenX;
+          layer.sprite.y = bodyY;
+          layer.sprite.rotation = rot;
+        }
+      }
+    }
+    this._updateParticles(cameraX, cameraYOffset, deltaSec);
+  }
+  enterShipMode(portalRect = null) {
+    if (this.p.isFlying) {
+      return;
+    }
+    this.p.isFlying = true;
+    this._scene.toggleGlitter(true);
+    this.p.yVelocity *= 0.5;
+    this.p.onGround = false;
+    this.p.canJump = false;
+    this.p.isJumping = false;
+    this.stopRotation();
+    this._rotation = 0;
+    this._particleEmitter.stop();
+    this._flyParticle2Active = false;
+    this._streak.reset();
+    this._streak.start();
+    this.setShipVisible(true);
+    for (const layer of this._playerLayers) {
+      if (layer) {
+        layer.sprite.setScale(0.55);
+      }
+    }
+    let flyAnchorY = this.p.y;
+    if (portalRect) {
+      flyAnchorY = portalRect.portalY !== undefined ? portalRect.portalY : portalRect.y;
+    }
+    this._gameLayer.setFlyMode(true, flyAnchorY);
+  }
+  exitShipMode() {
+    if (this.p.isFlying) {
+      this.p.isFlying = false;
+      this._scene.toggleGlitter(false);
+      this.p.yVelocity *= 0.5;
+      this.p.onGround = false;
+      this.p.canJump = false;
+      this.p.isJumping = false;
+      this.stopRotation();
+      this._rotation = 0;
+      this._flyParticleEmitter.stop();
+      this._flyParticleActive = false;
+      this._flyParticle2Emitter.stop();
+      this._flyParticle2Active = false;
+      this._shipDragEmitter.stop();
+      this._shipDragActive = false;
+      this._particleActive = false;
+      this._streak.stop();
+      this._streak.reset();
+      this.setShipVisible(false);
+      this.setCubeVisible(true);
+      for (const layer of this._playerLayers) {
+        if (layer) {
+          layer.sprite.setScale(1);
+        }
+      }
+      this._gameLayer.setFlyMode(false, 0);
+    }
+  }
+  hitGround() {
+    const wasAirborne = !this.p.onGround;
+    if (!this.p.isFlying) {
+      this.p.lastGroundY = this.p.y;
+    }
+    this.p.yVelocity = 0;
+    this.p.onGround = true;
+    this.p.canJump = true;
+    this.p.isJumping = false;
+    this.stopRotation();
+    if (wasAirborne && !this.p.isFlying) {
+      this._landIdx = !this._landIdx;
+      const emitter = this._landIdx ? this._landEmitter1 : this._landEmitter2;
+      const burstX = this._lastCameraX + viewportHalfMinus150;
+      const burstY = gameYToWorldY(this.p.y) + 30;
+      emitter.explode(10, burstX, burstY);
+    }
+  }
+  killPlayer() {
+    if (this.p.isDead) {
+      return;
+    }
+    this.p.isDead = true;
+    this._scene.toggleGlitter(false);
+    this._particleEmitter.stop();
+    this._particleActive = false;
+    this._flyParticleEmitter.stop();
+    this._flyParticleActive = false;
+    this._flyParticle2Emitter.stop();
+    this._flyParticle2Active = false;
+    this._shipDragEmitter.stop();
+    this._shipDragActive = false;
+    this._streak.stop();
+    this._streak.reset();
+    const scene = this._scene;
+    const deathX = scene._playerWorldX - scene._cameraX;
+    const deathY = gameYToWorldY(this.p.y) + this._lastCameraY;
+    const explosionScale = 0.9;
+    scene.add.particles(deathX, deathY, "GJ_WebSheet", {
+      frame: "square.png",
+      speed: {
+        min: 200,
+        max: 800
+      },
+      angle: {
+        min: 0,
+        max: 360
+      },
+      scale: {
+        start: 18 / 32,
+        end: 0
+      },
+      alpha: {
+        start: 1,
+        end: 0
+      },
+      lifespan: {
+        min: 50,
+        max: 800
+      },
+      quantity: 100,
+      stopAfter: 100,
+      blendMode: blendAdditive,
+      tint: tintLimeGreen,
+      x: {
+        min: -20,
+        max: 20
+      },
+      y: {
+        min: -20,
+        max: 20
+      }
+    }).setScrollFactor(0).setDepth(15);
+    const deathFlash = scene.add.graphics().setScrollFactor(0).setDepth(15).setBlendMode(blendAdditive);
+    const flashTween = {
+      t: 0
+    };
+    scene.tweens.add({
+      targets: flashTween,
+      t: 1,
+      duration: 500,
+      ease: "Quad.Out",
+      onUpdate: () => {
+        const radius = 18 + flashTween.t * 144;
+        const alpha = 1 - flashTween.t;
+        deathFlash.clear();
+        deathFlash.fillStyle(tintLimeGreen, alpha);
+        deathFlash.fillCircle(deathX, deathY, radius);
+      },
+      onComplete: () => deathFlash.destroy()
+    });
+    this._createExplosionPieces(deathX, deathY, explosionScale);
+    this.setCubeVisible(false);
+    this.setShipVisible(false);
+  }
+  _createExplosionPieces(centerX, centerY, scale) {
+    const scene = this._scene;
+    const captureSize = Math.round(scale * 40 * 2);
+    const rt = scene.make.renderTexture({
+      x: 0,
+      y: 0,
+      width: captureSize,
+      height: captureSize,
+      add: false
+    });
+    const spriteLayersForCapture = [this._playerGlowLayer, this._playerOverlayLayer, this._shipGlowLayer, this._shipOverlayLayer, this._playerSpriteLayer, this._playerExtraLayer, this._shipSpriteLayer, this._shipExtraLayer];
+    for (const entry of spriteLayersForCapture) {
+      if (!entry || !entry.sprite.visible) {
+        continue;
+      }
+      const spr = entry.sprite;
+      rt.draw(spr, captureSize / 2 + (spr.x - centerX), captureSize / 2 + (spr.y - centerY));
+    }
+    const texKey = "__deathRT_" + Date.now();
+    rt.saveTexture(texKey);
+    const texture = scene.textures.get(texKey);
+    let cols = 2 + Math.round(Math.random() * 2);
+    let rows = 2 + Math.round(Math.random() * 2);
+    const rarityRoll = Math.random();
+    if (rarityRoll > 0.95) {
+      cols = 1;
+    } else if (rarityRoll > 0.9) {
+      rows = 1;
+    }
+    const pieceVelBase = 7.4779225920000005;
+    const pieceVelMin = pieceVelBase * 0.5;
+    const pieceVelSpread = pieceVelBase * 1;
+    const sliceJitter = 0.45;
+    const colW = captureSize / cols;
+    const rowH = captureSize / rows;
+    const colWidths = [];
+    const rowHeights = [];
+    const colStarts = [0];
+    const rowStarts = [0];
+    let accW = 0;
+    let accH = 0;
+    for (let ci = 0; ci < cols - 1; ci++) {
+      const w = Math.round(colW * (0.55 + Math.random() * sliceJitter * 2));
+      colWidths.push(w);
+      accW += w;
+      colStarts.push(accW);
+    }
+    colWidths.push(captureSize - accW);
+    for (let ri = 0; ri < rows - 1; ri++) {
+      const h = Math.round(rowH * (0.55 + Math.random() * sliceJitter * 2));
+      rowHeights.push(h);
+      accH += h;
+      rowStarts.push(accH);
+    }
+    rowHeights.push(captureSize - accH);
+    this._explosionPieces = [];
+    this._explosionContainer = scene.add.container(centerX, centerY).setDepth(16);
+    let pieceCount = 0;
+    for (let ci = 0; ci < cols; ci++) {
+      const cw = colWidths[ci];
+      const cx0 = colStarts[ci];
+      for (let ri = 0; ri < rows; ri++) {
+        const rh = rowHeights[ri];
+        const ry0 = rowStarts[ri];
+        if (cw <= 0 || rh <= 0) {
+          continue;
+        }
+        pieceCount++;
+        const frameName = "piece_" + ci + "_" + ri;
+        texture.add(frameName, 0, cx0, ry0, cw, rh);
+        const pieceImg = scene.add.image(0, 0, texKey, frameName);
+        pieceImg.x = cx0 + cw / 2 - captureSize / 2;
+        pieceImg.y = -(ry0 + rh / 2 - captureSize / 2);
+        this._explosionContainer.add(pieceImg);
+        let trail = null;
+        if (pieceCount % 2 == 0) {
+          const life = 200 + Math.random() * 200;
+          const imgRef = pieceImg;
+          trail = scene.add.particles(0, 0, "GJ_WebSheet", {
+            frame: "square.png",
+            speed: 0,
+            scale: {
+              start: 0.5,
+              end: 0
+            },
+            alpha: {
+              start: 1,
+              end: 0
+            },
+            lifespan: life,
+            frequency: 25,
+            quantity: 1,
+            emitting: true,
+            blendMode: blendAdditive,
+            tint: tintLimeGreen,
+            emitCallback: particle => {
+              particle.x = imgRef.x + (Math.random() * 2 - 1) * 3 * 2;
+              particle.y = imgRef.y + (Math.random() * 2 - 1) * 3 * 2;
+            }
+          });
+          this._explosionContainer.addAt(trail, 0);
+        }
+        const piece = {
+          spr: pieceImg,
+          particle: trail,
+          xVel: pieceVelMin + (Math.random() * 2 - 1) * pieceVelSpread,
+          yVel: -(12 + (Math.random() * 2 - 1) * 6),
+          timer: 1.4,
+          fadeTime: 0.5,
+          rotDelta: (Math.random() * 2 - 1) * 360 / 60,
+          halfSize: Math.min(cw, rh) / 2
+        };
+        this._explosionPieces.push(piece);
+      }
+    }
+    this._explosionGroundSY = gameYToWorldY(0) + this._lastCameraY;
+    this._explosionRT = rt;
+    this._explosionTexKey = texKey;
+  }
+  clearExplosionDebrisOnly() {
+    this._cleanupExplosion();
+  }
+  updateExplosionPieces(deltaMs) {
+    if (!this._explosionPieces || this._explosionPieces.length === 0) {
+      return;
+    }
+    const dt = deltaMs / 1000;
+    const timeScaled = Math.min(dt * 60 * 0.9, 2);
+    const gravityStep = timeScaled * 0.5 * 2;
+    const groundLocalY = this._explosionGroundSY - this._explosionContainer.y;
+    let i = 0;
+    while (i < this._explosionPieces.length) {
+      const piece = this._explosionPieces[i];
+      piece.timer -= dt;
+      if (piece.timer > 0) {
+        piece.yVel += gravityStep;
+        piece.xVel *= 0.98 + (1 - timeScaled) * 0.02;
+        let nx = piece.spr.x + piece.xVel * timeScaled;
+        let ny = piece.spr.y + piece.yVel * timeScaled;
+        const floorY = groundLocalY - piece.halfSize;
+        if (ny > floorY && piece.yVel > 0) {
+          ny = floorY;
+          piece.yVel *= -0.8;
+          if (Math.abs(piece.yVel) < 3) {
+            piece.yVel = -3;
+          }
+        }
+        piece.spr.x = nx;
+        piece.spr.y = ny;
+        piece.spr.angle += piece.rotDelta * timeScaled;
+        if (piece.timer < piece.fadeTime) {
+          const fadeA = piece.timer / piece.fadeTime;
+          piece.spr.setAlpha(fadeA);
+          if (piece.particle) {
+            piece.particle.setAlpha(fadeA);
+          }
+        }
+        i++;
+      } else {
+        if (piece.particle) {
+          piece.particle.stop();
+          piece.particle.destroy();
+        }
+        piece.spr.destroy();
+        this._explosionPieces.splice(i, 1);
+      }
+    }
+    if (this._explosionPieces.length === 0) {
+      this._cleanupExplosion();
+    }
+  }
+  _cleanupExplosion() {
+    if (this._explosionPieces) {
+      for (const piece of this._explosionPieces) {
+        if (piece.particle) {
+          piece.particle.stop();
+          piece.particle.destroy();
+        }
+        if (piece.spr) {
+          piece.spr.destroy();
+        }
+      }
+    }
+    if (this._explosionContainer) {
+      this._explosionContainer.destroy();
+      this._explosionContainer = null;
+    }
+    if (this._explosionTexKey) {
+      this._scene.textures.remove(this._explosionTexKey);
+      this._explosionTexKey = null;
+    }
+    if (this._explosionRT) {
+      this._explosionRT.destroy();
+      this._explosionRT = null;
+    }
+    this._explosionPieces = null;
+  }
+  _playPortalShine(portalRect) {
+    const scene = this._scene;
+    const px = portalRect.x;
+    const py = gameYToWorldY(portalRect.portalY);
+    const shineFrames = ["portalshine_02_front_001.png", "portalshine_02_back_001.png"];
+    const targetContainers = [this._gameLayer.topContainer, this._gameLayer.container];
+    for (let li = 0; li < 2; li++) {
+      const resolved = resolveAtlasFrame(scene, shineFrames[li]);
+      if (!resolved) {
+        continue;
+      }
+      const img = scene.add.image(px, py, resolved.atlas, resolved.frame);
+      img.setBlendMode(blendAdditive);
+      img.setAlpha(0);
+      targetContainers[li].add(img);
+      scene.tweens.add({
+        targets: img,
+        alpha: {
+          from: 0,
+          to: 1
+        },
+        duration: 50,
+        onComplete: () => {
+          scene.tweens.add({
+            targets: img,
+            alpha: 0,
+            duration: 400,
+            onComplete: () => img.destroy()
+          });
+        }
+      });
+    }
+  }
+  _checkSnapJump(landRect) {
+    const snapOffsets = [{
+      dx: 240,
+      dy: 60
+    }, {
+      dx: 300,
+      dy: -60
+    }, {
+      dx: 180,
+      dy: 120
+    }];
+    const prev = this._lastLandObject;
+    if (prev && prev !== landRect && prev.type === collisionSolid) {
+      const px = prev.x;
+      const py = prev.y;
+      const nx = landRect.x;
+      const ny = landRect.y;
+      const gy = this.p.gravityFlipped ? -1 : 1;
+      let matched = false;
+      for (const off of snapOffsets) {
+        if (Math.abs(nx - (px + off.dx)) <= 2 && Math.abs(ny - (py + off.dy * gy)) <= 2) {
+          matched = true;
+          break;
+        }
+      }
+      if (matched) {
+        const targetX = landRect.x + this._lastXOffset;
+        const curX = this._scene._playerWorldX;
+        const snapped = Math.abs(targetX - curX) <= 2 ? targetX : targetX > curX ? curX + 2 : curX - 2;
+        this._scene._playerWorldX = snapped;
+      }
+    }
+    this._lastLandObject = landRect;
+    this._lastXOffset = this._scene._playerWorldX - landRect.x;
+  }
+  _isFallingPastThreshold() {
+    if (this.p.gravityFlipped) {
+      return this.p.yVelocity > 0.25;
+    } else {
+      return this.p.yVelocity < -0.25;
+    }
+  }
+  flipMod() {
+    if (this.p.gravityFlipped) {
+      return -1;
+    } else {
+      return 1;
+    }
+  }
+  runRotateAction() {
+    this.rotateActionActive = true;
+    this.rotateActionTime = 0;
+    this.rotateActionDuration = 0.39 / inputSmoothingMul;
+    this.rotateActionStart = this._rotation;
+    this.rotateActionTotal = Math.PI * this.flipMod();
+  }
+  stopRotation() {
+    this.rotateActionActive = false;
+  }
+  updateRotateAction(deltaSec) {
+    if (!this.rotateActionActive) {
+      return;
+    }
+    this.rotateActionTime += deltaSec;
+    if (this.rotateActionTime >= this.rotateActionDuration) {
+      this.rotateActionActive = false;
+    }
+    let t = Math.min(this.rotateActionTime / this.rotateActionDuration, 1);
+    this._rotation = this.rotateActionStart + this.rotateActionTotal * t;
+  }
+  convertToClosestRotation() {
+    const quarterTurn = Math.PI / 2;
+    return Math.round(this._rotation / quarterTurn) * quarterTurn;
+  }
+  slerp2D(fromAngle, toAngle, t) {
+    let diff = toAngle - fromAngle;
+    while (diff > Math.PI) {
+      diff -= Math.PI * 2;
+    }
+    while (diff < -Math.PI) {
+      diff += Math.PI * 2;
+    }
+    return fromAngle + diff * t;
+  }
+  updateGroundRotation(deltaSec) {
+    let target = this.convertToClosestRotation();
+    const smooth = 0.47250000000000003;
+    let step = Math.min(deltaSec * 1, smooth * deltaSec);
+    this._rotation = this.slerp2D(this._rotation, target, step);
+  }
+  updateShipRotation(deltaSec) {
+    let dy = -(this.p.y - this.p.lastY);
+    let dx = deltaSec * 10.3860036;
+    if (dx * dx + dy * dy >= deltaSec * 0.6) {
+      let targetAngle = Math.atan2(dy, dx);
+      const smooth = 0.15;
+      let step = Math.min(deltaSec * 1, smooth * deltaSec);
+      this._rotation = this.slerp2D(this._rotation, targetAngle, step);
+    }
+  }
+  playerIsFalling() {
+    if (this.p.gravityFlipped) {
+      return this.p.yVelocity > 3.832796;
+    } else {
+      return this.p.yVelocity < 3.832796;
+    }
+  }
+  updateJump(deltaSec) {
+    if (this.p.isFlying) {
+      this._updateFlyJump(deltaSec);
+    } else if (this.p.upKeyDown && this.p.canJump) {
+      this.p.isJumping = true;
+      this.p.onGround = false;
+      this.p.canJump = false;
+      this.p.upKeyPressed = false;
+      this.p.yVelocity = this.flipMod() * 22.360064;
+      this.runRotateAction();
+    } else if (this.p.isJumping) {
+      this.p.yVelocity -= gravityMul * deltaSec * this.flipMod();
+      if (this.playerIsFalling()) {
+        this.p.isJumping = false;
+        this.p.onGround = false;
+      }
+    } else {
+      if (this.playerIsFalling()) {
+        this.p.canJump = false;
+      }
+      this.p.yVelocity -= gravityMul * deltaSec * this.flipMod();
+      if (this.p.gravityFlipped) {
+        this.p.yVelocity = Math.min(this.p.yVelocity, 30);
+      } else {
+        this.p.yVelocity = Math.max(this.p.yVelocity, -30);
+      }
+      if (this._isFallingPastThreshold() && !this.rotateActionActive) {
+        this.runRotateAction();
+      }
+      if (this.playerIsFalling()) {
+        const fastFall = this.p.gravityFlipped ? this.p.yVelocity > 4 : this.p.yVelocity < -4;
+        if (fastFall) {
+          this.p.onGround = false;
+        }
+      }
+    }
+  }
+  _updateFlyJump(deltaSec) {
+    let liftMul = 0.8;
+    if (this.p.upKeyDown && !this.p.wasBoosted) {
+      liftMul = -1;
+    }
+    if (!this.p.upKeyDown && !this.playerIsFalling()) {
+      liftMul = 1.2;
+    }
+    let gravMul = 0.4;
+    if (this.p.upKeyDown && this.playerIsFalling()) {
+      gravMul = 0.5;
+    }
+    this.p.yVelocity -= gravityMul * deltaSec * this.flipMod() * liftMul * gravMul;
+    if (this.p.upKeyDown) {
+      this.p.onGround = false;
+    }
+    if (!this.p.wasBoosted) {
+      if (this.p.gravityFlipped) {
+        this.p.yVelocity = Math.max(this.p.yVelocity, -16);
+        this.p.yVelocity = Math.min(this.p.yVelocity, 12.8);
+      } else {
+        this.p.yVelocity = Math.max(this.p.yVelocity, -12.8);
+        this.p.yVelocity = Math.min(this.p.yVelocity, 16);
+      }
+    }
+  }
+  checkCollisions(cameraX) {
+    const halfW = 30;
+    const playerX = cameraX + viewportHalfMinus150;
+    const py = this.p.y;
+    const lastY = this.p.lastY;
+    const hitInset = this.p.isFlying ? 12 : 20;
+    this.p.collideTop = 0;
+    this.p.collideBottom = 0;
+    this.p.onCeiling = false;
+    let landedOnSolid = false;
+    const nearby = this._gameLayer.getNearbySectionObjects(playerX);
+    for (let rect of nearby) {
+      let left = rect.x - rect.w / 2;
+      let right = rect.x + rect.w / 2;
+      let top = rect.y - rect.h / 2;
+      let bottom = rect.y + rect.h / 2;
+      if (!(playerX + 30 <= left) && !(playerX - 30 >= right) && !(py + halfW <= top) && !(py - halfW >= bottom)) {
+        if (rect.type !== objectTypeFlyMode) {
+          if (rect.type !== objectTypeCubeMode) {
+            if (rect.type === collisionHazard) {
+              this.killPlayer();
+              return;
+            }
+            if (rect.type === collisionSolid) {
+              let feetPrev = py - halfW + hitInset;
+              let feetLast = lastY - halfW + hitInset;
+              let headPrev = py + halfW - hitInset;
+              let headLast = lastY + halfW - hitInset;
+              const crushPad = 9;
+              const crushZone = playerX + crushPad > left && playerX - crushPad < right && py + crushPad > top && py - crushPad < bottom;
+              const onTop = (this.p.yVelocity <= 0 || this.p.onGround) && (feetPrev >= bottom || feetLast >= bottom);
+              if (crushZone && !onTop) {
+                this.killPlayer();
+                return;
+              }
+              if (playerX + 30 - 5 > left && playerX - 30 + 5 < right) {
+                if ((feetPrev >= bottom || feetLast >= bottom) && (this.p.yVelocity <= 0 || this.p.onGround)) {
+                  this.p.y = bottom + halfW;
+                  this.hitGround();
+                  landedOnSolid = true;
+                  this.p.collideBottom = bottom;
+                  if (!this.p.isFlying) {
+                    this._checkSnapJump(rect);
+                  }
+                  continue;
+                }
+                if ((headPrev <= top || headLast <= top) && (this.p.yVelocity >= 0 || this.p.onGround) && this.p.isFlying) {
+                  this.p.y = top - halfW;
+                  this.hitGround();
+                  this.p.onCeiling = true;
+                  this.p.collideTop = top;
+                  continue;
+                }
+              }
+            }
+          } else if (!rect.activated) {
+            rect.activated = true;
+            this._playPortalShine(rect);
+            this.exitShipMode();
+          }
+        } else if (!rect.activated) {
+          rect.activated = true;
+          this._playPortalShine(rect);
+          this.enterShipMode(rect);
+        }
+      }
+    }
+    if (this.p.collideTop !== 0 && this.p.collideBottom !== 0) {
+      if (Math.abs(this.p.collideTop - this.p.collideBottom) < 48) {
+        this.killPlayer();
+        return;
+      }
+    }
+    let floorY = this._gameLayer.getFloorY();
+    if (!landedOnSolid) {
+      if (this.p.y <= floorY + 30) {
+        this.p.y = floorY + 30;
+        this.hitGround();
+      }
+    }
+    let ceilingY = this._gameLayer.getCeilingY();
+    if (ceilingY !== null && this.p.y >= ceilingY - 30) {
+      this.p.y = ceilingY - 30;
+      this.hitGround();
+      this.p.onCeiling = true;
+    }
+    if (this.p.isFlying) {
+      const onFloor = this.p.y <= floorY + 30;
+      const onCeil = ceilingY !== null && this.p.y >= ceilingY - 30;
+      if (!landedOnSolid && !onFloor && this.p.collideTop === 0 && !onCeil) {
+        this.p.onGround = false;
+      }
+    }
+  }
+  drawHitboxes(gfx, cameraX, cameraYOffset) {
+    gfx.clear();
+    if (!this._showHitboxes) {
+      return;
+    }
+    const half = 30;
+    const playerX = cameraX + viewportHalfMinus150;
+    const py = this.p.y;
+    const hitInset = this.p.isFlying ? 12 : 20;
+    const objs = this._gameLayer.getNearbySectionObjects(playerX);
+    for (let rect of objs) {
+      let rx = rect.x - cameraX;
+      let ry = gameYToWorldY(rect.y) + cameraYOffset;
+      let color = 65280;
+      if (rect.type === collisionHazard) {
+        color = 16729156;
+      } else if (rect.type === collisionPortalFly || rect.type === collisionPortalCube) {
+        color = 4491519;
+      }
+      gfx.lineStyle(2, color, 0.7);
+      gfx.strokeRect(rx - rect.w / 2, ry - rect.h / 2, rect.w, rect.h);
+    }
+    const cx = viewportHalfMinus150;
+    const bodyY = gameYToWorldY(py) + cameraYOffset;
+    gfx.lineStyle(2, 65535, 0.8);
+    gfx.strokeRect(cx - half, bodyY - half, gridCellPx, gridCellPx);
+    gfx.lineStyle(2, 16776960, 0.8);
+    gfx.strokeRect(cx - half + 5, bodyY - half, 50, gridCellPx);
+    gfx.lineStyle(2, 16711680, 0.8);
+    gfx.strokeRect(cx - half, bodyY - half + 5, gridCellPx, 50);
+    let topProbeY = gameYToWorldY(py - half + hitInset) + cameraYOffset;
+    let botProbeY = gameYToWorldY(py + half - hitInset) + cameraYOffset;
+    gfx.lineStyle(2, 16746496, 0.9);
+    gfx.lineBetween(cx - half - 8, topProbeY, cx + half + 8, topProbeY);
+    gfx.lineBetween(cx - half - 8, botProbeY, cx + half + 8, botProbeY);
+    gfx.lineStyle(2, 16777215, 1);
+    gfx.strokeRect(cx - 9, bodyY - 9, 36, 18);
+  }
+  setShowHitboxes(on) {
+    this._showHitboxes = on;
+  }
+  playEndAnimation(targetWorldX, onComplete, portalGameY) {
+    this._endAnimating = true;
+    const scene = this._scene;
+    const endY = portalGameY || 240;
+    const startX = scene._playerWorldX;
+    const startY = this.p.y;
+    const destX = targetWorldX + 100;
+    const destY = endY - 40;
+    const startXKeep = startX;
+    const startYKeep = startY;
+    const midX = startX + 80;
+    const midY = endY + 300;
+    const visibleSprites = [this._playerSpriteLayer, this._playerGlowLayer, this._playerOverlayLayer, this._playerExtraLayer, this._shipSpriteLayer, this._shipGlowLayer, this._shipOverlayLayer, this._shipExtraLayer].filter(L => L && L.sprite.visible).map(L => L.sprite);
+    this._particleEmitter.stop();
+    this._flyParticleEmitter.stop();
+    this._flyParticle2Emitter.stop();
+    this._shipDragEmitter.stop();
+    const flying = this.p.isFlying;
+    const shipLayers = [this._shipSpriteLayer, this._shipGlowLayer, this._shipOverlayLayer, this._shipExtraLayer];
+    const cubeLayers = [this._playerSpriteLayer, this._playerGlowLayer, this._playerOverlayLayer, this._playerExtraLayer];
+    const tweenSprites = visibleSprites.map(spr => {
+      let localY = 0;
+      if (flying) {
+        const isShip = shipLayers.some(L => L && L.sprite === spr);
+        const isCube = cubeLayers.some(L => L && L.sprite === spr);
+        if (isShip) {
+          localY = 10;
+        } else if (isCube) {
+          localY = -10;
+        }
+      }
+      return {
+        spr,
+        localY
+      };
+    });
+    const streak = this._streak;
+    const tweenState = {
+      val: 0
+    };
+    scene.tweens.add({
+      targets: tweenState,
+      val: 1,
+      duration: 1000,
+      ease: t => Math.pow(t, 1.2),
+      onUpdate: () => {
+        const u = tweenState.val;
+        const wx = (1 - u) ** 3 * startXKeep + (1 - u) ** 2 * 3 * u * startXKeep + (1 - u) * 3 * u ** 2 * midX + u ** 3 * destX;
+        const wy = (1 - u) ** 3 * startYKeep + (1 - u) ** 2 * 3 * u * startYKeep + (1 - u) * 3 * u ** 2 * midY + u ** 3 * destY;
+        const screenX = wx - scene._cameraX;
+        const screenY = gameYToWorldY(wy) + scene._cameraY;
+        const alpha = 1 - u * u;
+        const baseRot = tweenSprites[0].spr.rotation;
+        const cr = Math.cos(baseRot);
+        const sr = Math.sin(baseRot);
+        for (const entry of tweenSprites) {
+          const ox = -entry.localY * sr;
+          const oy = entry.localY * cr;
+          entry.spr.setPosition(screenX + ox, screenY + oy);
+          entry.spr.setAlpha(alpha);
+        }
+        streak.setPosition(wx, gameYToWorldY(wy));
+        streak.update(scene.game.loop.delta / 1000);
+      },
+      onComplete: () => {
+        for (const entry of tweenSprites) {
+          entry.spr.setVisible(false);
+        }
+        streak.stop();
+        streak.reset();
+        onComplete();
+      }
+    });
+    for (const spr of visibleSprites) {
+      scene.tweens.add({
+        targets: spr,
+        angle: spr.angle + 360,
+        duration: 1000,
+        ease: t => Math.pow(t, 1.5)
+      });
+    }
+  }
+  reset() {
+    this._cleanupExplosion();
+    this._endAnimating = false;
+    this._lastLandObject = null;
+    this._lastXOffset = 0;
+    this.stopRotation();
+    this.rotateActionTime = 0;
+    this._rotation = 0;
+    this._lastCameraX = 0;
+    this._lastCameraY = 0;
+    this.setCubeVisible(true);
+    this.setShipVisible(false);
+    for (const layer of this._allLayers) {
+      if (layer) {
+        layer.sprite.setAlpha(1);
+      }
+    }
+    for (const layer of this._playerLayers) {
+      if (layer) {
+        layer.sprite.setScale(1);
+      }
+    }
+    this._particleEmitter.stop();
+    this._particleActive = false;
+    this._flyParticleEmitter.stop();
+    this._flyParticleActive = false;
+    this._flyParticle2Emitter.stop();
+    this._flyParticle2Active = false;
+    this._shipDragEmitter.stop();
+    this._shipDragActive = false;
+    this._streak.stop();
+    this._streak.reset();
+  }
+}
+class ShipTrailRibbon {
+  constructor(scene, _textureKeyUnused, trailSeconds, minDist, strokeWidth, maxSegLen, color = 16777215, opacity = 1) {
+    this._color = color;
+    this._opacity = opacity;
+    this._fadeDelta = 1 / trailSeconds;
+    this._minSegSq = minDist * minDist;
+    this._maxSeg = maxSegLen;
+    this._maxPoints = Math.floor(trailSeconds * 60 + 2) * 5;
+    this._stroke = strokeWidth;
+    this._pts = [];
+    this._posR = {
+      x: 0,
+      y: 0
+    };
+    this._posInit = false;
+    this._active = false;
+    this._gfx = scene.add.graphics();
+    this._gfx.setBlendMode(Phaser.BlendModes.ADD);
+  }
+  addToContainer(container, depth) {
+    container.add(this._gfx);
+    this._gfx.setDepth(depth);
+  }
+  setPosition(x, y) {
+    this._posR.x = x;
+    this._posR.y = y;
+    this._posInit = true;
+  }
+  start() {
+    this._active = true;
+  }
+  stop() {
+    this._active = false;
+  }
+  reset() {
+    this._pts = [];
+    this._posInit = false;
+    this._gfx.clear();
+  }
+  update(deltaSec) {
+    if (!this._posInit) {
+      this._gfx.clear();
+      return;
+    }
+    const fade = deltaSec * this._fadeDelta;
+    let write = 0;
+    for (let i = 0; i < this._pts.length; i++) {
+      this._pts[i].state -= fade;
+      if (this._pts[i].state > 0) {
+        if (write !== i) {
+          this._pts[write] = this._pts[i];
+        }
+        write++;
+      }
+    }
+    this._pts.length = write;
+    if (this._active && this._pts.length < this._maxPoints) {
+      const ptCount = this._pts.length;
+      let addPoint = true;
+      if (ptCount > 0) {
+        const last = this._pts[ptCount - 1];
+        const dx = this._posR.x - last.x;
+        const dy = this._posR.y - last.y;
+        const distSq = dx * dx + dy * dy;
+        if (this._maxSeg > 0 && Math.sqrt(distSq) > this._maxSeg) {
+          this._pts.length = 0;
+        } else if (distSq < this._minSegSq) {
+          addPoint = false;
+        } else if (ptCount > 1) {
+          const prev = this._pts[ptCount - 2];
+          const dx2 = this._posR.x - prev.x;
+          const dy2 = this._posR.y - prev.y;
+          if (dx2 * dx2 + dy2 * dy2 < this._minSegSq * 2) {
+            addPoint = false;
+          }
+        }
+      }
+      if (addPoint) {
+        this._pts.push({
+          x: this._posR.x,
+          y: this._posR.y,
+          state: 1
+        });
+      }
+    }
+    this._gfx.clear();
+    const len = this._pts.length;
+    if (len >= 2) {
+      for (let i = 0; i < len - 1; i++) {
+        const a = this._pts[i];
+        const b = this._pts[i + 1];
+        const lineAlpha = (a.state + b.state) * 0.5 * this._opacity;
+        this._gfx.lineStyle(this._stroke, this._color, lineAlpha);
+        this._gfx.lineBetween(a.x, a.y, b.x, b.y);
+      }
+    }
+  }
+}
+
+function addDepthSpriteFromAtlas(scene, x, y, frameKey, depth, visible) {
+  const resolved = resolveAtlasFrame(scene, frameKey);
+  if (!resolved) {
+    return null;
+  }
+  const img = scene.add.image(x, y, resolved.atlas, resolved.frame);
+  img.setDepth(depth);
+  img.setVisible(visible);
+  return {
+    sprite: img
+  };
+}
+// audio, so music and sfx. getMeteringValue() feeds rod/orb pulse scaling
+class AudioManager {
+  constructor(scene) {
+    this._scene = scene;
+    this._music = null;
+    this._userMusicVol = scene.game.registry.get("userMusicVol") ?? 1;
+    this._meteringEnabled = false;
+    this._analyser = null;
+    this._meterBuffer = null;
+    this._meterValue = 0.1;
+    this._lastAudio = 0.1;
+    this._lastPeak = 0;
+    this._silenceCounter = 0;
+  }
+  _effectiveVolume() {
+    return this._userMusicVol * 0.8;
+  }
+  startMusic() {
+    if (this._music) {
+      this._music.stop();
+      this._music.destroy();
+    }
+    this._music = this._scene.sound.add("stereo_madness", {
+      loop: true,
+      volume: this._effectiveVolume()
+    });
+    this._music.play();
+    this._setupAnalyser();
+  }
+  stopMusic() {
+    if (this._music) {
+      this._music.stop();
+    }
+  }
+  pauseMusic() {
+    if (this._music && this._music.isPlaying) {
+      this._music.pause();
+    }
+  }
+  resumeMusic() {
+    if (this._music && this._music.isPaused) {
+      this._music.resume();
+    }
+  }
+  getUserMusicVolume() {
+    return this._userMusicVol;
+  }
+  setUserMusicVolume(volume) {
+    this._userMusicVol = volume;
+    this._scene.game.registry.set("userMusicVol", volume);
+    if (this._music) {
+      this._music.volume = this._effectiveVolume();
+    }
+  }
+  getMusicVolume() {
+    return this._effectiveVolume();
+  }
+  setMusicVolume(volume) {
+    this.setUserMusicVolume(volume / 0.8);
+  }
+  fadeInMusic(durationMs = 1000) {
+    if (this._music) {
+      this._music.stop();
+      this._music.destroy();
+    }
+    this._music = this._scene.sound.add("stereo_madness", {
+      loop: true,
+      volume: 0
+    });
+    this._music.play();
+    this._setupAnalyser();
+    this._scene.tweens.add({
+      targets: this._music,
+      volume: this._effectiveVolume(),
+      duration: durationMs
+    });
+  }
+  fadeOutMusic(durationMs = 1500) {
+    if (this._music && this._music.isPlaying) {
+      this._music.setLoop(false);
+      this._scene.tweens.add({
+        targets: this._music,
+        volume: 0,
+        duration: durationMs,
+        onComplete: () => {
+          if (this._music) {
+            this._music.stop();
+          }
+        }
+      });
+    }
+  }
+  playEffect(soundKey, config = {}) {
+    const sfxSceneMul = this._scene._sfxVolume !== undefined ? this._scene._sfxVolume : 1;
+    config.volume = (config.volume || 1) * sfxSceneMul;
+    this._scene.sound.play(soundKey, config);
+  }
+  _setupAnalyser() {
+    const audioCtx = this._scene.sound.context;
+    if (audioCtx) {
+      this._analyser = audioCtx.createAnalyser();
+      this._analyser.fftSize = 2048;
+      this._meterBuffer = new Float32Array(this._analyser.fftSize);
+      this._scene.sound.masterVolumeNode.connect(this._analyser);
+      this._meteringEnabled = true;
+    }
+  }
+  update(deltaSeconds) {
+    if (!this._meteringEnabled || !this._analyser) {
+      return;
+    }
+    this._analyser.getFloatTimeDomainData(this._meterBuffer);
+    let peakAbs = 0;
+    for (let si = 0; si < this._meterBuffer.length; si++) {
+      let sampleAbs = Math.abs(this._meterBuffer[si]);
+      if (sampleAbs > peakAbs) {
+        peakAbs = sampleAbs;
+      }
+    }
+    const musicVolNorm = this._effectiveVolume();
+    if (musicVolNorm > 0) {
+      peakAbs /= musicVolNorm;
+    }
+    this._meterValue = 0.1 + peakAbs;
+    const dtScaled = deltaSeconds * 60;
+    if (this._silenceCounter < 3 || this._meterValue < this._lastAudio * 1.1 || this._meterValue < this._lastPeak * 0.95 && this._lastAudio > this._lastPeak * 0.2) {
+      this._meterValue = this._lastAudio * Math.pow(0.92, dtScaled);
+    } else {
+      this._silenceCounter = 0;
+      this._lastPeak = this._meterValue;
+      this._meterValue *= Math.pow(1.46, dtScaled);
+    }
+    if (this._meterValue <= 0.1) {
+      this._lastPeak = 0;
+    }
+    this._lastAudio = this._meterValue;
+    this._silenceCounter++;
+  }
+  getMeteringValue() {
+    return this._meterValue;
+  }
+  reset() {
+    this._meterValue = 0.1;
+    this._lastAudio = 0.1;
+    this._lastPeak = 0;
+    this._silenceCounter = 0;
+    this.stopMusic();
+  }
+}
+// rgb tweens for level palette slots (COLOR_ID_BACKGROUND / COLOR_ID_GROUND from color triggers)
+class ColorManager {
+  constructor() {
+    this.reset();
+  }
+  reset() {
+    this._colors = {
+      [COLOR_ID_BACKGROUND]: {
+        r: 0,
+        g: 102,
+        b: 255
+      },
+      [COLOR_ID_GROUND]: {
+        r: 0,
+        g: 68,
+        b: 170
+      }
+    };
+    this._actions = {};
+  }
+  triggerColor(colorId, targetColor, duration) {
+    let fromRgb = {
+      ...this.getColor(colorId)
+    };
+    this._actions[colorId] = new RgbColorTween(fromRgb, targetColor, duration);
+    if (duration <= 0) {
+      this._colors[colorId] = {
+        ...targetColor
+      };
+    }
+  }
+  step(deltaSeconds) {
+    for (let colorId in this._actions) {
+      let tween = this._actions[colorId];
+      tween.step(deltaSeconds);
+      this._colors[colorId] = {
+        ...tween.current
+      };
+      if (tween.done) {
+        delete this._actions[colorId];
+      }
+    }
+  }
+  getColor(colorId) {
+    return this._colors[colorId] || {
+      r: 255,
+      g: 255,
+      b: 255
+    };
+  }
+  getHex(colorId) {
+    let rgb = this.getColor(colorId);
+    return rgb.r << 16 | rgb.g << 8 | rgb.b;
+  }
+}
+const COLOR_ID_BACKGROUND = 1000;
+const COLOR_ID_GROUND = 1001;
+
+class RgbColorTween {
+  constructor(fromRgb, toRgb, durationSec) {
+    this.from = {
+      ...fromRgb
+    };
+    this.to = {
+      ...toRgb
+    };
+    this.duration = durationSec;
+    this.elapsed = 0;
+    this.done = durationSec <= 0;
+    this.current = durationSec <= 0 ? {
+      ...toRgb
+    } : {
+      ...fromRgb
+    };
+  }
+  step(deltaSec) {
+    if (this.done) {
+      return;
+    }
+    this.elapsed += deltaSec;
+    let t = this.duration > 0 ? Math.min(this.elapsed / this.duration, 1) : 1;
+    if (t >= 1) {
+      this.current = {
+        ...this.to
+      };
+      this.done = true;
+    } else {
+      this.current = {
+        r: Math.round(this.from.r + (this.to.r - this.from.r) * t),
+        g: Math.round(this.from.g + (this.to.g - this.from.g) * t),
+        b: Math.round(this.from.b + (this.to.b - this.from.b) * t)
+      };
+    }
+  }
+}
+// parses bmfont .fnt text and registers a phaser bitmap font from the atlas texture
+function registerBitmapFontFromFnt(scene, textureKey, fntText) {
+  const atlasTexture = scene.textures.get(textureKey);
+  const imageSource = atlasTexture.source[0];
+  const texWidth = imageSource.width;
+  const texHeight = imageSource.height;
+  const fontData = {
+    font: textureKey,
+    size: 0,
+    lineHeight: 0,
+    chars: {}
+  };
+  const kerningPairs = [];
+  for (const lineStr of fntText.split("\n")) {
+    const tokens = lineStr.trim().split(/\s+/);
+    if (!tokens.length) {
+      continue;
+    }
+    const tag = tokens[0];
+    const attrs = {};
+    for (let ti = 1; ti < tokens.length; ti++) {
+      const eqIdx = tokens[ti].indexOf("=");
+      if (eqIdx >= 0) {
+        attrs[tokens[ti].slice(0, eqIdx)] = tokens[ti].slice(eqIdx + 1).replace(/^"|"$/g, "");
+      }
+    }
+    if (tag === "info") {
+      fontData.size = parseInt(attrs.size, 10);
+    } else if (tag === "common") {
+      fontData.lineHeight = parseInt(attrs.lineHeight, 10);
+    } else if (tag === "char") {
+      const charId = parseInt(attrs.id, 10);
+      const x = parseInt(attrs.x, 10);
+      const y = parseInt(attrs.y, 10);
+      const width = parseInt(attrs.width, 10);
+      const height = parseInt(attrs.height, 10);
+      const texU0 = x / texWidth;
+      const texV0 = y / texHeight;
+      const texU1 = (x + width) / texWidth;
+      const texV1 = (y + height) / texHeight;
+      fontData.chars[charId] = {
+        x,
+        y,
+        width,
+        height,
+        centerX: Math.floor(width / 2),
+        centerY: Math.floor(height / 2),
+        xOffset: parseInt(attrs.xoffset, 10),
+        yOffset: parseInt(attrs.yoffset, 10),
+        xAdvance: parseInt(attrs.xadvance, 10),
+        data: {},
+        kerning: {},
+        u0: texU0,
+        v0: texV0,
+        u1: texU1,
+        v1: texV1
+      };
+      if (width !== 0 && height !== 0) {
+        const charStr = String.fromCharCode(charId);
+        const charFrame = atlasTexture.add(charStr, 0, x, y, width, height);
+        if (charFrame) {
+          charFrame.setUVs(width, height, texU0, texV0, texU1, texV1);
+        }
+      }
+    } else if (tag === "kerning") {
+      kerningPairs.push({
+        first: parseInt(attrs.first, 10),
+        second: parseInt(attrs.second, 10),
+        amount: parseInt(attrs.amount, 10)
+      });
+    }
+  }
+  for (const kp of kerningPairs) {
+    if (fontData.chars[kp.second]) {
+      fontData.chars[kp.second].kerning[kp.first] = kp.amount;
+    }
+  }
+  scene.cache.bitmapFont.add(textureKey, {
+    data: fontData,
+    texture: textureKey,
+    frame: null
+  });
+}
+// level string parsing for the level format
+function parseGjLevelObjectRecord(recordText) {
+  const fields = recordText.split(",");
+  const rawByKey = {};
+
+  for (let i = 0; i + 1 < fields.length; i += 2) {
+    const key = parseInt(fields[i], 10);
+    const value = fields[i + 1];
+    rawByKey[key] = value;
+  }
+  const objectId = parseInt(rawByKey[1] || "0", 10);
+  if (objectId === 0) {
+    return null;
+  }
+  return {
+    id: objectId,
+    x: parseFloat(rawByKey[2] || "0"),
+    y: parseFloat(rawByKey[3] || "0"),
+    flipX: rawByKey[4] === "1",
+    flipY: rawByKey[5] === "1",
+    rot: parseFloat(rawByKey[6] || "0"),
+    scale: parseFloat(rawByKey[32] || "1"),
+    zLayer: parseInt(rawByKey[24] || "0", 10),
+    zOrder: parseInt(rawByKey[25] || "0", 10),
+    groups: rawByKey[57] || "",
+    color1: parseInt(rawByKey[21] || "0", 10),
+    color2: parseInt(rawByKey[22] || "0", 10),
+    _raw: rawByKey
+  };
+}
+
+function parseCompressedGjLevelString(levelBase64) {
+  const normalizedBase64 = (function normalizeBase64(raw) {
+    let padded = raw.replace(/-/g, "+").replace(/_/g, "/");
+    while (padded.length % 4 !== 0) {
+      padded += "=";
+    }
+    return padded;
+  })(levelBase64.trim());
+
+  const binary = atob(normalizedBase64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+
+  const inflated = zlibExports.inflate(bytes);
+  const decoded = new TextDecoder().decode(inflated);
+
+  const parts = decoded.split(";");
+  const settingsHeader = parts.length > 0 ? parts[0] : "";
+  const objects = [];
+
+  for (let i = 1; i < parts.length; i++) {
+    if (parts[i].length === 0) {
+      continue;
+    }
+    const parsedObject = parseGjLevelObjectRecord(parts[i]);
+    if (parsedObject) {
+      objects.push(parsedObject);
+    }
+  }
+
+  return {
+    settings: settingsHeader,
+    objects
+  };
+}
+// object type tags used by the registry and GameLevel collision/spawn logic
+const objectTypeDeco = "deco";
+const objectTypePortal = "portal";
+const objectTypePad = "pad";
+const objectTypeRing = "ring";
+const objectTypeTrigger = "trigger";
+const objectTypeSpeed = "speed";
+const objectTypeFlyMode = "fly";
+const objectTypeCubeMode = "cube";
+
+// object registry data: assets/data/objects.json (loaded in BootScene, see initobjectsFromJson)
+let gjObjectById = {};
+function initobjectsFromJson(pack) {
+  gjObjectById = {};
+  if (!pack || typeof pack.objects !== "object") {
+    return;
+  }
+  const raw = pack.objects;
+  for (const key of Object.keys(raw)) {
+    gjObjectById[+key] = raw[key];
+  }
+  const glowIds = pack.glowObjectIds || [];
+  for (let gi = 0; gi < glowIds.length; gi++) {
+    const oid = glowIds[gi];
+    if (gjObjectById[oid]) {
+      gjObjectById[oid].glow = true;
+    }
+  }
+}
+function getGjObjectById(objectId) {
+  return gjObjectById[objectId] || null;
+}
 function tweenRadialGraphic(scene, centerX, centerY, startRadius, endRadius, durationMs, filled = false, ringOnly = false, color = 16777215) {
   const gfx = scene.add.graphics().setScrollFactor(0).setDepth(55).setBlendMode(blendAdditive);
   const state = {
@@ -103914,6 +103864,197 @@ function spawnSparkleBurst(scene, tintA = 16777215, tintB = 16777215) {
     }
   }).setScrollFactor(0).setDepth(57);
 }
+function imagePathWithHdSuffix(path) {
+  return path.replace(/\.(png|jpg|jpeg|webp)$/i, "-hd.$1");
+}
+
+function imagePathForSpriteQuality(ldPath) {
+  if (spriteQuality !== "hd") {
+    return ldPath;
+  }
+  return imagePathWithHdSuffix(ldPath);
+}
+
+function fontFntPathWithHdSuffix(path) {
+  return path.replace(/\.fnt$/i, "-hd.fnt");
+}
+function fontFntPathForSpriteQuality(ldPath) {
+  if (spriteQuality !== "hd") {
+    return ldPath;
+  }
+  return fontFntPathWithHdSuffix(ldPath);
+}
+
+function scaleAtlasJsonForDoubleResolution(json) {
+  const out = JSON.parse(JSON.stringify(json));
+  const textures = out.textures;
+  if (!textures) {
+    return out;
+  }
+  for (let ti = 0; ti < textures.length; ti++) {
+    const tex = textures[ti];
+    if (tex.size) {
+      if (typeof tex.size.w === "number") {
+        tex.size.w *= 2;
+      }
+      if (typeof tex.size.h === "number") {
+        tex.size.h *= 2;
+      }
+    }
+    const frames = tex.frames;
+    if (!frames) {
+      continue;
+    }
+    for (let fi = 0; fi < frames.length; fi++) {
+      const fr = frames[fi];
+      if (fr.frame) {
+        fr.frame.x *= 2;
+        fr.frame.y *= 2;
+        fr.frame.w *= 2;
+        fr.frame.h *= 2;
+      }
+    }
+  }
+  return out;
+}
+
+function loadJsonSync(url) {
+  const xhr = new XMLHttpRequest();
+  xhr.open("GET", url, false);
+  xhr.send(null);
+  if (xhr.status !== 200 && xhr.status !== 0) {
+    throw new Error("Failed to load JSON: " + url + " (status " + xhr.status + ")");
+  }
+  return JSON.parse(xhr.responseText);
+}
+
+const HDTextureKeys = new Set(["GJ_WebSheet", "game_bg_01", "sliderBar", "square04_001", "GJ_square02"]);
+
+function installHdWebglSpriteQuadPatch(game) {
+  if (spriteQuality !== "hd" || !game || !game.renderer) {
+    return;
+  }
+  if (game.renderer.type !== Phaser.WEBGL && game.renderer.type !== 2) {
+    return;
+  }
+  const Pipelines = Phaser.Renderer && Phaser.Renderer.WebGL && Phaser.Renderer.WebGL.Pipelines;
+  const MP = Pipelines && Pipelines.MultiPipeline;
+  if (!MP || !MP.prototype || !MP.prototype.batchSprite || MP.prototype.__hdQuadPatchInstalled) {
+    return;
+  }
+  const orig = MP.prototype.batchSprite;
+  MP.prototype.batchSprite = function (gameObject, camera, parentMatrix) {
+    if (gameObject.isCropped) {
+      return orig.call(this, gameObject, camera, parentMatrix);
+    }
+    const frame = gameObject.frame;
+    if (!frame || frame.rotated) {
+      return orig.call(this, gameObject, camera, parentMatrix);
+    }
+    const texKey = frame.texture.key;
+    if (!HDTextureKeys.has(texKey)) {
+      return orig.call(this, gameObject, camera, parentMatrix);
+    }
+    const cw = frame.cutWidth;
+    const ch = frame.cutHeight;
+    const fw = frame.width;
+    const fh = frame.height;
+    if (!(cw > fw + 0.5 || ch > fh + 0.5)) {
+      return orig.call(this, gameObject, camera, parentMatrix);
+    }
+    frame.cutWidth = fw;
+    frame.cutHeight = fh;
+    try {
+      return orig.call(this, gameObject, camera, parentMatrix);
+    } finally {
+      frame.cutWidth = cw;
+      frame.cutHeight = ch;
+    }
+  };
+  MP.prototype.__hdQuadPatchInstalled = true;
+}
+
+function applyHdTextureSizeFixes(scene) {
+  if (spriteQuality !== "hd") {
+    return;
+  }
+  const atlasKey = "GJ_WebSheet";
+  if (scene.textures.exists(atlasKey)) {
+    const atlasTex = scene.textures.get(atlasKey);
+    const src0 = atlasTex.source[0];
+    if (src0) {
+      src0.resolution = 2;
+    }
+    const frameNames = atlasTex.getFrameNames();
+    for (let i = 0; i < frameNames.length; i++) {
+      const name = frameNames[i];
+      if (name === "__BASE") {
+        continue;
+      }
+      const frame = atlasTex.get(name);
+      if (!frame || frame.trimmed) {
+        continue;
+      }
+      const cd = frame.customData;
+      if (!cd || !cd.sourceSize || !cd.spriteSourceSize) {
+        continue;
+      }
+      const ss = cd.sourceSize;
+      const sss = cd.spriteSourceSize;
+      frame.setTrim(ss.w, ss.h, sss.x, sss.y, sss.w, sss.h);
+    }
+  }
+  const hdStandalone = scene._hdStandaloneKeys;
+  if (hdStandalone && hdStandalone.size) {
+    hdStandalone.forEach(key => {
+      if (!scene.textures.exists(key)) {
+        return;
+      }
+      const tex = scene.textures.get(key);
+      const s = tex.source[0];
+      if (s) {
+        s.resolution = 2;
+      }
+      const fr = tex.get();
+      if (!fr || fr.trimmed) {
+        return;
+      }
+      const cw = fr.cutWidth;
+      const ch = fr.cutHeight;
+      if (cw <= 0 || ch <= 0) {
+        return;
+      }
+      fr.setTrim(cw / 2, ch / 2, 0, 0, cw / 2, ch / 2);
+    });
+  }
+  installHdWebglSpriteQuadPatch(scene.game);
+}
+const TEXTURE_ATLAS_KEYS = ["GJ_WebSheet"];
+
+function resolveAtlasFrame(scene, frameKey) {
+  for (let atlasKey of TEXTURE_ATLAS_KEYS) {
+    if (scene.textures.exists(atlasKey)) {
+      if (scene.textures.get(atlasKey).has(frameKey)) {
+        return {
+          atlas: atlasKey,
+          frame: frameKey
+        };
+      }
+    }
+  }
+  return null;
+}
+
+function addAtlasOrStandaloneImage(scene, x, y, textureKeyOrFrame) {
+  const hit = resolveAtlasFrame(scene, textureKeyOrFrame);
+  if (hit) {
+    return scene.add.image(x, y, hit.atlas, hit.frame);
+  }
+  if (scene.textures.exists(textureKeyOrFrame)) {
+    return scene.add.image(x, y, textureKeyOrFrame);
+  }
+  return null;
+}
 const gameConfig = {
     type: Phaser.AUTO,
     width: gameWidth * renderScale,
@@ -103924,6 +104065,6 @@ const gameConfig = {
     input: {windowEvents: false},
     render: {powerPreference: "high-performance"},
     scale: {mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH},
-    scene: [BootScene, GameScene]
+    scene: [BootScene, LoadingScene, GameScene]
 };
 const game = new Phaser.Game(gameConfig);

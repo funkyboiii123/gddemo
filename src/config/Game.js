@@ -8,6 +8,6 @@ const gameConfig = {
     input: {windowEvents: false},
     render: {powerPreference: "high-performance"},
     scale: {mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH},
-    scene: [BootScene, GameScene]
+    scene: [BootScene, LoadingScene, GameScene]
 };
 const game = new Phaser.Game(gameConfig);

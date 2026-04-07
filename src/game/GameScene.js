@@ -228,6 +228,7 @@ class GameScene extends Phaser.Scene {
       this.game.registry.remove(GDRegistry.FadeInFromBlack);
       this.cameras.main.fadeIn(SceneFadeMs.EndMenuIn, 0, 0, 0);
     }
+    this.game.events.emit("gd:gamescene-ready");
   }
   _pauseRowButtonAction(kind) {
     switch (kind) {
