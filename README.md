@@ -26,7 +26,7 @@ this is a [complete](https://github.com/sogful/gddemo/commit/b5542726113a3000e3d
 
 - clone the repository:
    ```
-   git clone https://github.com/sogful/gddemo.git
+   git clone https://github.com/funkyboiii123/gddemo.git
    cd gddemo
    ```
 - install dependencies and build:
