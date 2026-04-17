@@ -10,7 +10,8 @@ class GameScene extends Phaser.Scene {
     if (this.cache.audio.exists("stereo_madness")) {
       this.cache.audio.remove("stereo_madness");
     }
-    this.load.audio("stereo_madness", "assets/audio/StereoMadness.mp3");
+// this is where the game's song is set, change this to use other music!
+    this.load.audio("stereo_madness", "assets/audio/BackOnTrack.mp3");
   }
   create() {
     setSceneRenderZoom(this);
